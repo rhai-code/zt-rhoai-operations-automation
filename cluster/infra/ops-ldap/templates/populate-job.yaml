@@ -39,7 +39,7 @@ spec:
               if [ -z "$FREEIPA_POD" ] || [ "$READY" != "true" ]; then
                 echo "FreeIPA never became ready"; exit 1
               fi
-              kubectl exec -n {{ .Values.freeipaNamespace }} "$FREEIPA_POD" -- bash -s <<REMOTE
+              kubectl exec -i -n {{ .Values.freeipaNamespace }} "$FREEIPA_POD" -- bash -s <<REMOTE
               set -e
               echo '{{ .Values.password }}' | kinit admin
               add_group() { ipa group-show "\$1" >/dev/null 2>&1 || ipa group-add "\$1" --desc="\$2"; }

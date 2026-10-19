@@ -1,0 +1,32 @@
+# SELinux boolean on the nodes — the freeipa-server container runs systemd as
+# PID 1, which fails (exit 255, no logs) with SELinux enforcing unless
+# container_manage_cgroup is enabled on the nodes.
+# https://access.redhat.com/solutions/4910611
+# NOTE: applying a MachineConfig triggers a rolling reboot of the matching
+# nodes (one-time disruption). The unit runs Before=kubelet.service at every
+# boot, so the boolean is re-applied on each node restart.
+{{- if .Values.machineconfig.enabled }}
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: {{ .Values.machineconfig.role }}
+  name: 01-sebool-container-manage-cgroup
+spec:
+  config:
+    ignition:
+      version: {{ .Values.machineconfig.ignitionVersion }}
+    systemd:
+      units:
+      - contents: |
+          [Unit]
+          Description=Enable container_manage_cgroup on nodes running FreeIPA
+          Before=kubelet.service
+          [Service]
+          ExecStart=/usr/sbin/setsebool container_manage_cgroup 1
+          [Install]
+          WantedBy=multi-user.target
+        enabled: true
+        name: sebool-container-manage-cgroup.service
+{{- end }}

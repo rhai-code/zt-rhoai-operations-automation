@@ -33,3 +33,12 @@ resources:
   limits:
     cpu: "2"
     memory: 4Gi
+
+# SELinux boolean on the nodes (see templates/machineconfig.yaml). Applying it
+# triggers a rolling reboot of the matching nodes — one-time disruption.
+# role: worker covers every node with the worker role (this cluster's
+# control-plane node also carries it).
+machineconfig:
+  enabled: true
+  role: worker
+  ignitionVersion: 3.4.0
