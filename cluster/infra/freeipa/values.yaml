@@ -9,10 +9,12 @@
 
 namespace: freeipa
 
-# Fedoracapital demo identity
+# Fedoracapital demo identity. The server's own hostname MUST match what the
+# OCP-native LDAP IdP connects to (ldaps://freeipa.<ns>.svc.cluster.local:636) —
+# the headless service resolves to the pod, so the cert matches.
 realm: FEDORACAPITAL.IO
 domain: fedoracapital.io
-hostname: freeipa.fedoracapital.io
+hostname: freeipa.freeipa.svc.cluster.local
 password: REPLACE_AT_APPLY # set at the one-time bootstrap apply — never committed
 
 # Storage for /data (the ipa-server-install persists here; survives restarts)
