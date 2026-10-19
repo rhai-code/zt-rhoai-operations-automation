@@ -59,36 +59,24 @@ spec:
               # Set up the GLOBAL truststore (used by all subsequent https requests)
               $KC config truststore /tmp/keycloak-ts.jks --trustpass changeit
               $KC config credentials --server https://keycloak.keycloak.svc:8443 --realm master --user "$ADMIN_USER" --password "$ADMIN_PASSWORD"
-              if $KC get user-federations/ldap -r "$REALM" 2>/dev/null | grep -q '"name"\s*:\s*"freeipa-ldap"'; then
+              # The LDAP federation is stored as a REALM COMPONENT (the user-federations
+              # admin-API path does not exist in this Keycloak version)
+              REALM_ID=$($KC get realms/keycloak -r master --fields id --format csv --noquotes 2>/dev/null | tail -1)
+              if [ -z "$REALM_ID" ]; then
+                echo "Could not resolve the realm id"; exit 1
+              fi
+              if $KC get components -r "$REALM" -q "type=org.keycloak.storage.UserStorageProvider" 2>/dev/null | grep -q '"name"\s*:\s*"freeipa-ldap"'; then
                 echo "LDAP federation freeipa-ldap already exists"
               else
-                echo "Creating LDAP user federation freeipa-ldap"
-                $KC create user-federations/ldap -r "$REALM" \
+                echo "Creating LDAP user federation freeipa-ldap (realm component)"
+                $KC create components -r "$REALM" \
                   -s name=freeipa-ldap \
-                  -s enabled=true \
-                  -s priority=0 \
-                  -s importUsers=true \
-                  -s editMode=READ_ONLY \
-                  -s syncRegistrations=false \
-                  -s usernameLDAPAttribute=uid \
-                  -s rdnLDAPAttribute=uid \
-                  -s uuidLDAPAttribute=ipautoidnumber \
-                  -s userObjectClasses=inetOrgPerson,organizationalPerson \
-                  -s connectionUrl=ldaps://freeipa.$KEYCLOAK_NS.svc.cluster.local:636 \
-                  -s "bindDN=uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io" \
-                  -s bindPassword="$FREEIPA_PASSWORD" \
-                  -s "usersDn=cn=users,cn=accounts,dc=fedoracapital,dc=io" \
-                  -s searchScope=1 \
-                  -s useTruststoreSpi=ldapsOnly \
-                  -s connectionPooling=true \
-                  -s pagination=true \
-                  -s validatePasswordPolicy=false \
-                  -s trustEmail=false \
-                  -s cachePolicy=DEFAULT \
-                  -s fullSyncPeriod=-1 \
-                  -s changedSyncPeriod=-1
+                  -s providerId=ldap \
+                  -s providerType=org.keycloak.storage.UserStorageProvider \
+                  -s "parentId=$REALM_ID" \
+                  -s "config={\"enabled\":[\"true\"],\"priority\":[\"0\"],\"importUsers\":[\"true\"],\"editMode\":[\"READ_ONLY\"],\"syncRegistrations\":[\"false\"],\"usernameLDAPAttribute\":[\"uid\"],\"rdnLDAPAttribute\":[\"uid\"],\"uuidLDAPAttribute\":[\"ipautoidnumber\"],\"userObjectClasses\":[\"inetOrgPerson,organizationalPerson\"],\"connectionUrl\":[\"ldaps://freeipa.$KEYCLOAK_NS.svc.cluster.local:636\"],\"bindDN\":[\"uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io\"],\"bindPassword\":[\"$FREEIPA_PASSWORD\"],\"usersDn\":[\"cn=users,cn=accounts,dc=fedoracapital,dc=io\"],\"searchScope\":[\"1\"],\"useTruststoreSpi\":[\"ldapsOnly\"],\"connectionPooling\":[\"true\"],\"pagination\":[\"true\"],\"validatePasswordPolicy\":[\"false\"],\"trustEmail\":[\"false\"],\"cachePolicy\":[\"DEFAULT\"],\"fullSyncPeriod\":[\"-1\"],\"changedSyncPeriod\":[\"-1\"]}"
               fi
-              FED_ID=$($KC get user-federations/ldap/freeipa-ldap -r "$REALM" --fields id --format csv --noquotes 2>/dev/null | tail -1)
+              FED_ID=$($KC get components -r "$REALM" -q "name=freeipa-ldap" --fields id --format csv --noquotes 2>/dev/null | tail -1)
               if [ -z "$FED_ID" ]; then
                 echo "Could not resolve the freeipa-ldap federation id"; exit 1
               fi
@@ -101,7 +89,7 @@ spec:
                   -s providerId=group-ldap-mapper \
                   -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
                   -s parentId="$FED_ID" \
-                  -s 'config={"mode":"LDAP_ONLY","syncRegistrations":true,"groupsDn":"cn=groups,cn=accounts,dc=fedoracapital,dc=io","groupNameLdapAttribute":"cn","groupObjectClasses":["groupOfNames"],"preserveGroupInheritance":false,"membershipType":"DN","membershipLdapAttribute":"member","membershipLdapAttributeType":"dn","userGroupsRetrieveStrategy":"LOAD_GROUPS_BY_MEMBER_ATTRIBUTE","memberofLdapAttribute":"memberOf","ignoreMissingGroups":false,"pagination":true}'
+                  -s "config={\"mode\":[\"LDAP_ONLY\"],\"syncRegistrations\":[\"true\"],\"groupsDn\":[\"cn=groups,cn=accounts,dc=fedoracapital,dc=io\"],\"groupNameLdapAttribute\":[\"cn\"],\"groupObjectClasses\":[\"groupOfNames\"],\"preserveGroupInheritance\":[\"false\"],\"membershipType\":[\"DN\"],\"membershipLdapAttribute\":[\"member\"],\"membershipLdapAttributeType\":[\"dn\"],\"userGroupsRetrieveStrategy\":[\"LOAD_GROUPS_BY_MEMBER_ATTRIBUTE\"],\"memberofLdapAttribute\":[\"memberOf\"],\"ignoreMissingGroups\":[\"false\"],\"pagination\":[\"true\"]}"
               fi
               CLIENT_ID=$($KC get clients -r "$REALM" -q "clientId=$OPENID_CLIENT" --fields id --format csv --noquotes 2>/dev/null | tail -1)
               if [ -z "$CLIENT_ID" ]; then
