@@ -46,9 +46,11 @@ freeipa:
   ingressDomain: apps.cluster-guid.example.com # from deployer.domain at apply time
 
 # ---------------------------------------------------------------------------
-# opsLdap — post-install setup Jobs: persona population, FreeIPA CA + Keycloak
-# truststore, LDAP user federation + group mapper into the existing Keycloak
-# realm, and the OCP OAuth groups claim. Enabled by default.
+# opsLdap — post-install setup Jobs: persona population, the FreeIPA CA for the
+# OCP-native LDAP identity provider, and the OCP-native LDAP IdP (type: LDAP)
+# against FreeIPA (ldaps://636, memberOf filter). Personas auth via the LDAP IdP;
+# the admin user continues to auth via the existing Keycloak IdP (rhbk).
+# Enabled by default.
 # ---------------------------------------------------------------------------
 opsLdap:
   enabled: true
@@ -56,12 +58,7 @@ opsLdap:
     path: cluster/infra/ops-ldap
     <<: *git_defaults
   freeipaNamespace: freeipa
-  keycloakNamespace: keycloak
-  keycloakName: keycloak # existing Keycloak CR name (rhbk operator)
-  keycloakRealm: keycloak # existing realm served to OCP OAuth
-  keycloakIngressHostname: sso.apps.cluster-guid.example.com # from deployer.domain
-  openidClient: idp-4-ocp # existing OCP OAuth client in the realm
-  oauthIdpName: rhbk # existing OCP OAuth IdP name
+  oauthIdpName: rhbk # existing Keycloak (rhbk) IdP — needed for the admin user
   realm: FEDORACAPITAL.IO
   domain: fedoracapital.io
   hostname: freeipa.fedoracapital.io

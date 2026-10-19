@@ -1,0 +1,55 @@
+# OCP-native LDAP identity provider (type: LDAP) — adds the freeipa-ldap IdP to
+# the OCP OAuth against FreeIPA (ldaps://636, memberOf filter scoping users to
+# the rhods-users group). Personas auth via the LDAP IdP; the admin user continues
+# to auth via the existing Keycloak IdP (rhbk). Idempotent (name check).
+{{- if .Values.password }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oauth-ldap-idp
+  namespace: {{ .Values.freeipaNamespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: freeipa-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: ldap-idp
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          env:
+            - name: FREEIPA_PASSWORD
+              value: {{ .Values.password }}
+            - name: REALM_LDAP
+              value: {{ .Values.realm }}
+            - name: LDAP_DOMAIN
+              value: {{ .Values.domain }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              # Bind password secret (in openshift-config, where the LDAP IdP's bindPassword ref points)
+              oc create secret generic freeipa-ldap-bind-password \
+                --from-literal=bindPassword="$FREEIPA_PASSWORD" \
+                -n openshift-config --dry-run=client -o yaml | oc apply -f -
+              if oc get oauth cluster -o json 2>/dev/null | grep -q '"name"\s*:\s*"freeipa-ldap"'; then
+                echo "LDAP identity provider freeipa-ldap already configured"
+              else
+                echo "Adding the LDAP identity provider freeipa-ldap to the OCP OAuth"
+                oc patch oauth cluster --type=json -p '[{"op":"add","path":"/spec/identityProviders/-","value":{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["displayName"],"preferredUsername":["uid"]},"bindDN":"uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io","bindPassword":{"name":"freeipa-ldap-bind-password"},"ca":{"name":"freeipa-ca"},"insecure":false,"url":"ldaps://freeipa.freeipa.svc.cluster.local:636/dc=fedoracapital,dc=io?uid?sub?(memberOf=cn=rhods-users,cn=groups,cn=accounts,dc=fedoracapital,dc=io)"},"mappingMethod":"claim","name":"freeipa-ldap","type":"LDAP"}}]'
+              fi
+              for i in $(seq 1 40); do
+                STATUS=$(oc rollout status deployment/oauth-openshift -n openshift-authentication --timeout=30s 2>/dev/null | tail -1 || true)
+                if echo "$STATUS" | grep -q "successfully rolled out"; then
+                  echo "OAuth server rolled out"; break
+                fi
+                echo "Waiting for the OAuth server roll ($i/40)..."; sleep 15
+              done
+              oc get oauth cluster -o jsonpath='{range .spec.identityProviders[*]}{.name}{"\t"}{.type}{"\n"}{end}'
+              echo "OCP OAuth configured: personas auth via the LDAP IdP (freeipa-ldap), admin via the Keycloak IdP (rhbk)"
+{{- end }}

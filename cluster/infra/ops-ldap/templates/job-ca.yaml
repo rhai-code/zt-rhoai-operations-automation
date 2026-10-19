@@ -1,0 +1,43 @@
+# FreeIPA CA — extracts /etc/ipa/ca.crt from the FreeIPA pod and creates the
+# freeipa-ca Secret in ns openshift-config, where the OCP-native LDAP identity
+# provider's `ca` reference points (templates/job-oauth-ldap-idp.yaml).
+# Idempotent (dry-run client secret).
+{{- if .Values.password }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: freeipa-ca
+  namespace: {{ .Values.freeipaNamespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: freeipa-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: ca
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              for i in $(seq 1 120); do
+                FREEIPA_POD=$(kubectl get pods -n {{ .Values.freeipaNamespace }} -l app=freeipa -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+                READY=$(kubectl get pod -n {{ .Values.freeipaNamespace }} "$FREEIPA_POD" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || true)
+                if [ -n "$FREEIPA_POD" ] && [ "$READY" = "true" ]; then break; fi
+                echo "Waiting for FreeIPA ($i/120)..."; sleep 15
+              done
+              if [ -z "$FREEIPA_POD" ] || [ "$READY" != "true" ]; then
+                echo "FreeIPA never became ready"; exit 1
+              fi
+              kubectl exec -n {{ .Values.freeipaNamespace }} "$FREEIPA_POD" -- cat /etc/ipa/ca.crt > /tmp/ca.crt
+              kubectl create secret generic freeipa-ca \
+                --from-file=ca.crt=/tmp/ca.crt \
+                -n openshift-config --dry-run=client -o yaml | kubectl apply -f -
+              echo "FreeIPA CA configured in openshift-config for the LDAP identity provider"
+{{- end }}
