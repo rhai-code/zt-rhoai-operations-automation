@@ -39,7 +39,7 @@ freeipa:
   namespace: freeipa
   realm: FEDORACAPITAL.IO
   domain: fedoracapital.io
-  hostname: freeipa.fedoracapital.io
+  hostname: freeipa.freeipa.svc.cluster.local # MUST match the LDAP IdP URL (ldaps://636) so the cert validates
   password: REPLACE_AT_APPLY # set at the one-time apply — never committed
   storageClass: "" # cluster default (ocs-external-storagecluster-ceph-rbd)
   storageSize: 5Gi
@@ -61,5 +61,5 @@ opsLdap:
   oauthIdpName: rhbk # existing Keycloak (rhbk) IdP — needed for the admin user
   realm: FEDORACAPITAL.IO
   domain: fedoracapital.io
-  hostname: freeipa.fedoracapital.io
+  hostname: freeipa.freeipa.svc.cluster.local
   password: REPLACE_AT_APPLY # set at the one-time apply — never committed

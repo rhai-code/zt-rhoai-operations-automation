@@ -18,5 +18,5 @@ oauthIdpName: rhbk # existing Keycloak (rhbk) IdP name — needed for the admin 
 # Fedoracapital demo identity
 realm: FEDORACAPITAL.IO
 domain: fedoracapital.io
-hostname: freeipa.fedoracapital.io
+hostname: freeipa.freeipa.svc.cluster.local
 password: REPLACE_AT_APPLY # set at the one-time bootstrap apply — never committed
