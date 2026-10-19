@@ -55,7 +55,7 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     resourceNames: ["freeipa-ca"]
-    verbs: ["get", "update"]
+    verbs: ["get", "update", "patch"]
   - apiGroups: ["k8s.keycloak.org"]
     resources: ["keycloaks"]
     resourceNames: ["{{ .Values.keycloakName }}"]
