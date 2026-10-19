@@ -15,7 +15,7 @@ spec:
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
-    - group: oauthes.config.openshift.io
+    - group: config.openshift.io
       kind: OAuth
     - group: rbac.authorization.k8s.io
       kind: ClusterRole
@@ -23,6 +23,10 @@ spec:
       kind: ClusterRoleBinding
     - group: machineconfiguration.openshift.io
       kind: MachineConfig
+    # user.openshift.io/Group is cluster-scoped — the restored rhods-admins
+    # Group needs it whitelisted (the namespace '*' whitelist doesn't apply)
+    - group: user.openshift.io
+      kind: Group
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"
