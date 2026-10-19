@@ -1,0 +1,70 @@
+# Scheduled LDAP group sync — syncs OpenShift groups from FreeIPA via
+# `oc adm groups sync` (RFC2307bis: the group's member attribute lists user DNs).
+# The OAuth LDAP IdP authenticates users, but LDAP IdPs do not map groups on
+# login — this cronjob lands the persona groups with their members.
+{{- if .Values.password }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ldap-group-sync
+  namespace: {{ .Values.freeipaNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  schedule: "0 * * * *" # '@hourly'
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        spec:
+          serviceAccountName: freeipa-setup
+          restartPolicy: OnFailure
+          containers:
+            - name: group-sync
+              image: registry.redhat.io/openshift4/ose-cli:latest
+              env:
+                - name: FREEIPA_PASSWORD
+                  value: {{ .Values.password }}
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  mkdir -p /tmp/ldap-sync
+                  cat > /tmp/ldap-sync/sync.yaml <<CFG
+                  kind: LDAPSyncConfig
+                  apiVersion: v1
+                  url: "ldap://freeipa.{{ .Values.freeipaNamespace }}.svc.cluster.local:389"
+                  bindDN: "uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io"
+                  bindPassword: "$FREEIPA_PASSWORD"
+                  insecure: true
+                  augmentedActiveDirectory:
+                    groupsQuery:
+                      baseDN: "cn=groups,cn=accounts,dc=fedoracapital,dc=io"
+                      scope: sub
+                      derefAliases: never
+                    groupUIDAttribute: dn
+                    groupNameAttributes: ["cn"]
+                    usersQuery:
+                      baseDN: "cn=users,cn=accounts,dc=fedoracapital,dc=io"
+                      scope: sub
+                      derefAliases: never
+                      filter: "(objectclass=person)"
+                    userNameAttributes: ["uid"]
+                    groupMembershipAttributes: ["memberOf"]
+                  CFG
+                  cat > /tmp/ldap-sync/whitelist.txt <<WL
+                  cn=rhods-users,cn=groups,cn=accounts,dc=fedoracapital,dc=io
+                  cn=rhods-admins,cn=groups,cn=accounts,dc=fedoracapital,dc=io
+                  cn=lending-data-owners,cn=groups,cn=accounts,dc=fedoracapital,dc=io
+                  cn=lending-data-stewards,cn=groups,cn=accounts,dc=fedoracapital,dc=io
+                  cn=lending-data-scientists,cn=groups,cn=accounts,dc=fedoracapital,dc=io
+                  cn=insurance-data-owners,cn=groups,cn=accounts,dc=fedoracapital,dc=io
+                  cn=insurance-data-stewards,cn=groups,cn=accounts,dc=fedoracapital,dc=io
+                  cn=insurance-data-scientists,cn=groups,cn=accounts,dc=fedoracapital,dc=io
+                  cn=ml-engineers,cn=groups,cn=accounts,dc=fedoracapital,dc=io
+                  WL
+                  oc adm groups sync --sync-config=/tmp/ldap-sync/sync.yaml --whitelist=/tmp/ldap-sync/whitelist.txt
+                  echo "OpenShift groups synced from FreeIPA"
+{{- end }}
