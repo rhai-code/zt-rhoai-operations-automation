@@ -1,7 +1,8 @@
 # FreeIPA CA — extracts /etc/ipa/ca.crt from the FreeIPA pod and creates the
-# freeipa-ca Secret in ns openshift-config, where the OCP-native LDAP identity
-# provider's `ca` reference points (templates/job-oauth-ldap-idp.yaml).
-# Idempotent (dry-run client secret).
+# freeipa-ca ConfigMap in ns openshift-config, where the OCP-native LDAP identity
+# provider's `ca` reference points (templates/job-oauth-ldap-idp.yaml). The OAuth
+# ca ref requires a ConfigMap with a ca.crt key (NOT a Secret).
+# Idempotent (dry-run client configmap).
 {{- if .Values.password }}
 apiVersion: batch/v1
 kind: Job
@@ -36,7 +37,7 @@ spec:
                 echo "FreeIPA never became ready"; exit 1
               fi
               kubectl exec -n {{ .Values.freeipaNamespace }} "$FREEIPA_POD" -- cat /etc/ipa/ca.crt > /tmp/ca.crt
-              kubectl create secret generic freeipa-ca \
+              kubectl create configmap freeipa-ca \
                 --from-file=ca.crt=/tmp/ca.crt \
                 -n openshift-config --dry-run=client -o yaml | kubectl apply -f -
               echo "FreeIPA CA configured in openshift-config for the LDAP identity provider"
