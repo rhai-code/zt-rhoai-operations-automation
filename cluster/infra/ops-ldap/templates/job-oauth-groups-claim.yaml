@@ -33,7 +33,28 @@ spec:
             - |
               set -euo pipefail
               echo "Adding the groups claim to the $OAUTH_IDP_NAME IdP on OCP OAuth"
-              oc patch oauth cluster --type=json -p '[{"op":"add","path":"/spec/identityProviders/0/openID/claims/groups","value":["groups"]}]'
+              # The OpenID IdP is NOT at a fixed position: the oauth-ldap-idp job
+              # (sync-wave 3) keeps the LDAP IdP FIRST in the identityProviders
+              # list, so patching /0/openID here would hit the LDAP IdP (invalid:
+              # no openID field). Find the OpenID IdP's index instead.
+              IDX=""
+              i=0
+              NAMES=$(oc get oauth cluster -o jsonpath='{.spec.identityProviders[*].name}')
+              for name in $NAMES; do
+                if [ "$name" = "$OAUTH_IDP_NAME" ]; then IDX=$i; fi
+                i=$((i+1))
+              done
+              if [ -z "$IDX" ]; then
+                echo "ERROR: IdP $OAUTH_IDP_NAME not found in the OCP OAuth identityProviders" >&2
+                exit 1
+              fi
+              CLAIMED=$(oc get oauth cluster -o jsonpath="{.spec.identityProviders[$IDX].openID.claims.groups[*]}")
+              if echo "$CLAIMED" | grep -q "groups"; then
+                echo "groups claim already set on $OAUTH_IDP_NAME (index $IDX): [$CLAIMED]"
+              else
+                oc patch oauth cluster --type=json -p "[{\"op\":\"add\",\"path\":\"/spec/identityProviders/$IDX/openID/claims/groups\",\"value\":[\"groups\"]}]"
+                echo "groups claim added to $OAUTH_IDP_NAME (index $IDX)"
+              fi
               for i in $(seq 1 40); do
                 STATUS=$(oc rollout status deployment/oauth-openshift -n openshift-authentication --timeout=30s 2>/dev/null | tail -1 || true)
                 if echo "$STATUS" | grep -q "successfully rolled out"; then
