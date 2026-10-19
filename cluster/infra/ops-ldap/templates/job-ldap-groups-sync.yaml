@@ -50,6 +50,7 @@ spec:
                       baseDN: "cn=groups,cn=accounts,dc=fedoracapital,dc=io"
                       scope: sub
                       derefAliases: never
+                      filter: "(objectclass=groupofnames)"
                     groupUIDAttribute: dn
                     groupNameAttributes: ["cn"]
                     usersQuery:
@@ -57,6 +58,7 @@ spec:
                       scope: sub
                       derefAliases: never
                       filter: "(objectclass=person)"
+                    userUIDAttribute: dn
                     userNameAttributes: ["uid"]
                     groupMembershipAttributes: ["member"]
                   CFG
