@@ -89,7 +89,7 @@ spec:
                   -s providerId=group-ldap-mapper \
                   -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
                   -s parentId="$FED_ID" \
-                  -s "config={\"mode\":[\"LDAP_ONLY\"],\"syncRegistrations\":[\"true\"],\"groupsDn\":[\"cn=groups,cn=accounts,dc=fedoracapital,dc=io\"],\"groupNameLdapAttribute\":[\"cn\"],\"groupObjectClasses\":[\"groupOfNames\"],\"preserveGroupInheritance\":[\"false\"],\"membershipType\":[\"DN\"],\"membershipLdapAttribute\":[\"member\"],\"membershipLdapAttributeType\":[\"dn\"],\"userGroupsRetrieveStrategy\":[\"LOAD_GROUPS_BY_MEMBER_ATTRIBUTE\"],\"memberofLdapAttribute\":[\"memberOf\"],\"ignoreMissingGroups\":[\"false\"],\"pagination\":[\"true\"]}"
+                  -s "config={\"mode\":[\"LDAP_ONLY\"],\"groups.dn\":[\"cn=groups,cn=accounts,dc=fedoracapital,dc=io\"],\"group.name.ldap.attribute\":[\"cn\"],\"group.object.classes\":[\"groupOfNames\"],\"membership.ldap.attribute\":[\"member\"],\"membership.attribute.type\":[\"DN\"],\"user.roles.retrieve.strategy\":[\"LOAD_GROUPS_BY_MEMBER_ATTRIBUTE\"],\"memberof.ldap.attribute\":[\"memberOf\"],\"preserve.group.inheritance\":[\"false\"],\"ignore.missing.groups\":[\"false\"],\"pagination\":[\"true\"]}"
               fi
               CLIENT_ID=$($KC get clients -r "$REALM" -q "clientId=$OPENID_CLIENT" --fields id --format csv --noquotes 2>/dev/null | tail -1)
               if [ -z "$CLIENT_ID" ]; then
