@@ -5,6 +5,10 @@
 #     the OAuth LDAP IdP's `ca` ref + the bind password secret for the IdP's
 #     `bindPassword` ref)
 #   - cluster-scoped OAuth patch (the LDAP IdP + groups-claim jobs)
+#   - deployments get/list/watch in ns openshift-authentication (the OAuth roll-out
+#     check after patching: `oc rollout status deployment/oauth-openshift` needs
+#     get/list/watch; without it the check is Forbidden and silently burns the
+#     full wait loop — the discarded stderr hides the error)
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -72,6 +76,30 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: freeipa-setup-openshift-config
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: freeipa-setup-oauth-rollout
+  namespace: openshift-authentication
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: freeipa-setup-oauth-rollout
+  namespace: openshift-authentication
+subjects:
+  - kind: ServiceAccount
+    name: freeipa-setup
+    namespace: {{ .Values.freeipaNamespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: freeipa-setup-oauth-rollout
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
