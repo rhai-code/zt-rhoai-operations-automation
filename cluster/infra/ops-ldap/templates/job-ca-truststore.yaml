@@ -42,9 +42,9 @@ spec:
               echo "Patching Keycloak CR {{ .Values.keycloakName }} with the truststore"
               kubectl patch keycloak {{ .Values.keycloakName }} -n {{ .Values.keycloakNamespace }} --type=merge -p '{
                 "spec": {
-                  "truststores": [
-                    { "name": "freeipa-ca", "secret": { "name": "freeipa-ca" } }
-                  ]
+                  "truststores": {
+                    "freeipa-ca": { "secret": { "name": "freeipa-ca" } }
+                  }
                 }
               }'
               for i in $(seq 1 120); do
