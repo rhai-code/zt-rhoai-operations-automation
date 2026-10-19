@@ -31,6 +31,12 @@ spec:
                 - -c
                 - |
                   set -euo pipefail
+                  # groupMembershipAttributes is ON THE GROUP and lists USER
+                  # DNs - in FreeIPA that is `member`. memberOf lives on the
+                  # USER (listing group DNs). The rfc2307 schema reads the
+                  # membership attribute on the group entry; the original
+                  # augmentedActiveDirectory schema reads it on the user,
+                  # which landed empty groups.
                   mkdir -p /tmp/ldap-sync
                   cat > /tmp/ldap-sync/sync.yaml <<CFG
                   kind: LDAPSyncConfig
@@ -39,7 +45,7 @@ spec:
                   bindDN: "uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io"
                   bindPassword: "$FREEIPA_PASSWORD"
                   insecure: true
-                  augmentedActiveDirectory:
+                  rfc2307:
                     groupsQuery:
                       baseDN: "cn=groups,cn=accounts,dc=fedoracapital,dc=io"
                       scope: sub
@@ -52,10 +58,6 @@ spec:
                       derefAliases: never
                       filter: "(objectclass=person)"
                     userNameAttributes: ["uid"]
-                    # groupMembershipAttributes is ON THE GROUP and lists USER
-                    # DNs — in FreeIPA that's `member`. `memberOf` lives on the
-                    # USER (listing group DNs); syncing via it finds no members
-                    # and creates no groups.
                     groupMembershipAttributes: ["member"]
                   CFG
                   # whitelist: persona groups only. rhods-admins is Git-owned
