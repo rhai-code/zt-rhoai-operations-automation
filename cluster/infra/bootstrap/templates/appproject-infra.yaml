@@ -1,6 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
   name: infra
   namespace: openshift-gitops
 spec:
@@ -8,12 +10,8 @@ spec:
   sourceRepos:
     - https://github.com/rhai-code/zt-rhoai-operations-automation
   destinations:
-    - server: https://kubernetes.default.svc
-      namespace: freeipa
-    - server: https://kubernetes.default.svc
-      namespace: keycloak
-    - server: https://kubernetes.default.svc
-      namespace: openshift-gitops
+    - namespace: '*'
+      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

@@ -68,6 +68,21 @@ spec:
         opsLdap:
           password: <same>
           keycloakIngressHostname: sso.apps.cluster-jt286.dyn.redhatworkshops.io
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
 EOF
 ```
 
