@@ -58,7 +58,7 @@ spec:
               kubectl exec -n $KEYCLOAK_NS $KEYCLOAK_NAME-0 -- bash -c "keytool -delete -alias keycloak-tls -keystore /tmp/keycloak-ts.jks -storepass changeit >/dev/null 2>&1; keytool -importcert -file /mnt/certificates/tls.crt -keystore /tmp/keycloak-ts.jks -storepass changeit -noprompt -alias keycloak-tls"
               # Set up the GLOBAL truststore (used by all subsequent https requests)
               $KC config truststore /tmp/keycloak-ts.jks --trustpass changeit
-              $KC config credentials --server https://localhost:8443 --realm master --user "$ADMIN_USER" --password "$ADMIN_PASSWORD"
+              $KC config credentials --server https://keycloak.keycloak.svc:8443 --realm master --user "$ADMIN_USER" --password "$ADMIN_PASSWORD"
               if $KC get user-federations/ldap -r "$REALM" 2>/dev/null | grep -q '"name"\s*:\s*"freeipa-ldap"'; then
                 echo "LDAP federation freeipa-ldap already exists"
               else
