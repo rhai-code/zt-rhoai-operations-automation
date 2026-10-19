@@ -65,6 +65,6 @@ spec:
                   cn=insurance-data-scientists,cn=groups,cn=accounts,dc=fedoracapital,dc=io
                   cn=ml-engineers,cn=groups,cn=accounts,dc=fedoracapital,dc=io
                   WL
-                  oc adm groups sync --sync-config=/tmp/ldap-sync/sync.yaml --whitelist=/tmp/ldap-sync/whitelist.txt
+                  oc adm groups sync --sync-config=/tmp/ldap-sync/sync.yaml --whitelist=/tmp/ldap-sync/whitelist.txt --confirm
                   echo "OpenShift groups synced from FreeIPA"
 {{- end }}
