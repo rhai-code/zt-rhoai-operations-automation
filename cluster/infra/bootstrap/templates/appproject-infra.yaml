@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: infra
+  namespace: openshift-gitops
+spec:
+  description: Infra layer of the RHOAI Operations workshop (LDAP directory + identity federation)
+  sourceRepos:
+    - https://github.com/rhai-code/zt-rhoai-operations-automation
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: freeipa
+    - server: https://kubernetes.default.svc
+      namespace: keycloak
+    - server: https://kubernetes.default.svc
+      namespace: openshift-gitops
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: oauthes.config.openshift.io
+      kind: OAuth
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

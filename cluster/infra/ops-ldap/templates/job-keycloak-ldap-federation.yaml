@@ -1,0 +1,116 @@
+# LDAP user federation into the EXISTING Keycloak — kcadm.sh against the rhbk
+# server (execs into the keycloak pod): creates the LDAP user federation + a
+# group-ldap-mapper in the EXISTING realm (idempotent: skips anything that
+# already exists), and a groups protocol mapper on the OCP OAuth client so the
+# JWT carries the "groups" claim. Idempotent, so the hook can re-run.
+{{- if .Values.password }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-ldap-federation
+  namespace: {{ .Values.freeipaNamespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: freeipa-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: federation
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          env:
+            - name: FREEIPA_PASSWORD
+              value: {{ .Values.password }}
+            - name: KEYCLOAK_NAME
+              value: {{ .Values.keycloakName }}
+            - name: KEYCLOAK_NS
+              value: {{ .Values.keycloakNamespace }}
+            - name: REALM
+              value: {{ .Values.keycloakRealm }}
+            - name: OPENID_CLIENT
+              value: {{ .Values.openidClient }}
+            - name: REALM_LDAP
+              value: {{ .Values.realm }}
+            - name: LDAP_DOMAIN
+              value: {{ .Values.domain }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              for i in $(seq 1 120); do
+                READY=$(kubectl get pod "$KEYCLOAK_NAME-0" -n "$KEYCLOAK_NS" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || true)
+                if [ "$READY" = "true" ]; then break; fi
+                echo "Waiting for Keycloak ($i/120)..."; sleep 15
+              done
+              if [ "$READY" != "true" ]; then
+                echo "Keycloak never became ready"; exit 1
+              fi
+              ADMIN_USER=$(kubectl get secret "$KEYCLOAK_NAME-initial-admin" -n "$KEYCLOAK_NS" -o jsonpath='{.data.username}' | base64 -d)
+              ADMIN_PASSWORD=$(kubectl get secret "$KEYCLOAK_NAME-initial-admin" -n "$KEYCLOAK_NS" -o jsonpath='{.data.password}' | base64 -d)
+              KC="kubectl exec -n $KEYCLOAK_NS $KEYCLOAK_NAME-0 -- /opt/keycloak/bin/kcadm.sh"
+              $KC config credentials --server http://localhost:8080 --realm master --user "$ADMIN_USER" --password "$ADMIN_PASSWORD"
+              if $KC get user-federations/ldap -r "$REALM" 2>/dev/null | grep -q '"name"\s*:\s*"freeipa-ldap"'; then
+                echo "LDAP federation freeipa-ldap already exists"
+              else
+                echo "Creating LDAP user federation freeipa-ldap"
+                $KC create user-federations/ldap -r "$REALM" \
+                  -s name=freeipa-ldap \
+                  -s enabled=true \
+                  -s priority=0 \
+                  -s importUsers=true \
+                  -s editMode=READ_ONLY \
+                  -s syncRegistrations=false \
+                  -s usernameLDAPAttribute=uid \
+                  -s rdnLDAPAttribute=uid \
+                  -s uuidLDAPAttribute=ipautoidnumber \
+                  -s userObjectClasses=inetOrgPerson,organizationalPerson \
+                  -s connectionUrl=ldaps://freeipa.$KEYCLOAK_NS.svc.cluster.local:636 \
+                  -s "bindDN=uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io" \
+                  -s bindPassword="$FREEIPA_PASSWORD" \
+                  -s "usersDn=cn=users,cn=accounts,dc=fedoracapital,dc=io" \
+                  -s searchScope=1 \
+                  -s useTruststoreSpi=ldapsOnly \
+                  -s connectionPooling=true \
+                  -s pagination=true \
+                  -s validatePasswordPolicy=false \
+                  -s trustEmail=false \
+                  -s cachePolicy=DEFAULT \
+                  -s fullSyncPeriod=-1 \
+                  -s changedSyncPeriod=-1
+              fi
+              FED_ID=$($KC get user-federations/ldap/freeipa-ldap -r "$REALM" --fields id --format csv --noquotes 2>/dev/null | tail -1)
+              if [ -z "$FED_ID" ]; then
+                echo "Could not resolve the freeipa-ldap federation id"; exit 1
+              fi
+              if $KC get components -r "$REALM" 2>/dev/null | grep -q '"name"\s*:\s*"freeipa-groups"'; then
+                echo "Group mapper freeipa-groups already exists"
+              else
+                echo "Creating group-ldap-mapper freeipa-groups"
+                $KC create components -r "$REALM" \
+                  -s name=freeipa-groups \
+                  -s providerId=group-ldap-mapper \
+                  -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+                  -s parentId="$FED_ID" \
+                  -s 'config={"mode":"LDAP_ONLY","syncRegistrations":true,"groupsDn":"cn=groups,cn=accounts,dc=fedoracapital,dc=io","groupNameLdapAttribute":"cn","groupObjectClasses":["groupOfNames"],"preserveGroupInheritance":false,"membershipType":"DN","membershipLdapAttribute":"member","membershipLdapAttributeType":"dn","userGroupsRetrieveStrategy":"LOAD_GROUPS_BY_MEMBER_ATTRIBUTE","memberofLdapAttribute":"memberOf","ignoreMissingGroups":false,"pagination":true}'
+              fi
+              CLIENT_ID=$($KC get clients -r "$REALM" -q "clientId=$OPENID_CLIENT" --fields id --format csv --noquotes 2>/dev/null | tail -1)
+              if [ -z "$CLIENT_ID" ]; then
+                echo "Could not resolve the $OPENID_CLIENT client id"; exit 1
+              fi
+              if $KC get clients/$CLIENT_ID/protocol-mappers/models -r "$REALM" 2>/dev/null | grep -q '"name"\s*:\s*"fedoracapital-groups"'; then
+                echo "Groups mapper fedoracapital-groups already exists"
+              else
+                echo "Creating groups protocol mapper fedoracapital-groups on client $OPENID_CLIENT"
+                $KC create clients/$CLIENT_ID/protocol-mappers/models -r "$REALM" \
+                  -s name=fedoracapital-groups \
+                  -s protocol=openid-connect \
+                  -s protocolMapper=oidc-group-membership-mapper \
+                  -s 'config={"full.group.path":false,"id.token.claim":false,"access.token.claim":true,"userinfo.token.claim":true,"multivalued":true,"claim.name":"groups"}'
+              fi
+              echo "LDAP federation configured: users + groups federated from $REALM_LDAP ($LDAP_DOMAIN) into realm $REALM"
+{{- end }}

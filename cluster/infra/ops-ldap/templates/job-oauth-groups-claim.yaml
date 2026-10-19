@@ -1,0 +1,46 @@
+# OCP OAuth groups claim — adds the "groups" claim to the EXISTING rhbk IdP so
+# OCP applies the JWT groups (from the groups protocol mapper) as OpenShift
+# groups (mappingMethod: claim). Idempotent (add sets the value).
+{{- if .Values.password }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oauth-groups-claim
+  namespace: {{ .Values.freeipaNamespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: freeipa-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: oauth-claim
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          env:
+            - name: OAUTH_IDP_NAME
+              value: {{ .Values.oauthIdpName }}
+            - name: KEYCLOAK_NS
+              value: {{ .Values.keycloakNamespace }}
+            - name: REALM
+              value: {{ .Values.keycloakRealm }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              echo "Adding the groups claim to the $OAUTH_IDP_NAME IdP on OCP OAuth"
+              oc patch oauth cluster --type=json -p '[{"op":"add","path":"/spec/identityProviders/0/openID/claims/groups","value":["groups"]}]'
+              for i in $(seq 1 40); do
+                STATUS=$(oc rollout status deployment/oauth-openshift -n openshift-authentication --timeout=30s 2>/dev/null | tail -1 || true)
+                if echo "$STATUS" | grep -q "successfully rolled out"; then
+                  echo "OAuth server rolled out"; break
+                fi
+                echo "Waiting for the OAuth server roll ($i/40)..."; sleep 15
+              done
+              oc get oauth cluster -o jsonpath='{range .spec.identityProviders[*]}{.name}{"\t"}{.openID.issuer}{"\t"}{.openID.claims.groups}{"\n"}{end}'
+              echo "OCP OAuth configured: groups arrive via the JWT claim from realm $REALM"
+{{- end }}

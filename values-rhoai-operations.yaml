@@ -1,0 +1,32 @@
+deployer:
+  domain: apps.cluster.example.com
+  apiUrl: https://api.cluster.example.com:6443
+
+showroom:
+  namespace: showroom-rhoai-operations
+  gitRepoUrl: https://github.com/YOUR_ORG/zt-rhoai-operations-showroom
+  gitRepoRef: main
+  antoraPlaybook: site.yml
+  ztBundle: https://github.com/rhpds/nookbag/releases/download/nookbag-v0.3.6/nookbag-v0.3.6.zip
+  ztUiEnabled: "true"
+  guid: workshop
+  user: user1
+  password: openshift
+  projectName: rhoai-ops
+  clusterSetup:
+    enabled: true
+  rbac:
+    namespaceEdit: true
+  wetty:
+    sshHost: PLACEHOLDER_SSH_HOST
+    sshPort: "22"
+    sshUser: lab-user
+    sshAuth: password
+    sshPass: PLACEHOLDER_SSH_PASS
+  images:
+    oseCli: registry.redhat.io/openshift4/ose-cli:latest
+    gitCloner: quay.io/rhpds/git-cloner:v1.1.5
+    antora: quay.io/rhpds/antora:v1.3.0
+    content: quay.io/rhpds/showroom-content:v1.4.2
+    nginx: quay.io/rhpds/nginx:1.25
+    wetty: quay.io/rhpds/wetty:v2.7.6

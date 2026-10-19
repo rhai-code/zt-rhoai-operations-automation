@@ -1,0 +1,8 @@
+*.tgz
+charts/
+rendered/
+# Per-cluster deploy values carry lab-scoped credentials (passwords, wetty sshPass)
+# and accumulate per cluster — never commit. The template (values-rhoai-operations.yaml)
+# stays in git as the placeholder version.
+values-*.yaml
+!values-rhoai-operations.yaml

@@ -1,0 +1,17 @@
+# Route exposing the FreeIPA web UI. The IPA cert is issued for
+# {{ .Values.hostname }} (freeipa.fedoracapital.io) — expect a browser cert
+# mismatch on the route host; acceptable for the lab demo.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: freeipa
+  namespace: {{ .Values.namespace }}
+spec:
+  host: ipa.{{ .Values.ingressDomain }}
+  to:
+    kind: Service
+    name: freeipa
+  port:
+    targetPort: https
+  tls:
+    termination: passthrough

@@ -1,0 +1,72 @@
+# Persona population — creates the data-stewardship personas and groups in
+# FreeIPA (idempotent: skips anything that already exists, so the hook can
+# re-run on every sync):
+#   lending LOB:   own-alice (owner), ste-carol (steward), sci-eve (scientist)
+#   insurance LOB: own-bob (owner),  ste-dave (steward),  sci-frank (scientist)
+#   platform:      mle-gina (ML engineer), ops-admin (platform admin)
+{{- if .Values.password }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: freeipa-populate
+  namespace: {{ .Values.freeipaNamespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: freeipa-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: populate
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              for i in $(seq 1 120); do
+                FREEIPA_POD=$(kubectl get pods -n {{ .Values.freeipaNamespace }} -l app=freeipa -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+                READY=$(kubectl get pod -n {{ .Values.freeipaNamespace }} "$FREEIPA_POD" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || true)
+                if [ -n "$FREEIPA_POD" ] && [ "$READY" = "true" ]; then
+                  echo "FreeIPA pod $FREEIPA_POD is ready"; break
+                fi
+                echo "Waiting for FreeIPA ($i/120)..."; sleep 15
+              done
+              if [ -z "$FREEIPA_POD" ] || [ "$READY" != "true" ]; then
+                echo "FreeIPA never became ready"; exit 1
+              fi
+              kubectl exec -n {{ .Values.freeipaNamespace }} "$FREEIPA_POD" -- bash -s <<REMOTE
+              set -e
+              echo '{{ .Values.password }}' | kinit admin
+              add_group() { ipa group-show "\$1" >/dev/null 2>&1 || ipa group-add "\$1" --desc="\$2"; }
+              add_group lending-data-owners       "Data Owners, Lending LOB"
+              add_group lending-data-stewards     "Data Stewards, Lending LOB"
+              add_group lending-data-scientists   "Data Scientists, Lending LOB"
+              add_group insurance-data-owners     "Data Owners, Insurance LOB"
+              add_group insurance-data-stewards   "Data Stewards, Insurance LOB"
+              add_group insurance-data-scientists "Data Scientists, Insurance LOB"
+              add_group ml-engineers              "ML Engineers / Platform Ops"
+              add_group rhods-admins              "RHOAI Administrators"
+              add_group rhods-users               "RHOAI Users"
+              add_user() {
+                local u="\$1"; local first="\$2"; shift 2
+                ipa user-show "\$u" >/dev/null 2>&1 || printf '%s\n%s\n' '{{ .Values.password }}' '{{ .Values.password }}' | ipa user-add "\$u" --first="\$first" --last=Workshop --password
+                local g
+                for g in "\$@"; do ipa group-add-member "\$g" --users="\$u" || true; done
+              }
+              add_user own-alice Alice lending-data-owners rhods-users
+              add_user ste-carol Carol lending-data-stewards rhods-users
+              add_user sci-eve Eve lending-data-scientists rhods-users
+              add_user own-bob Bob insurance-data-owners rhods-users
+              add_user ste-dave Dave insurance-data-stewards rhods-users
+              add_user sci-frank Frank insurance-data-scientists rhods-users
+              add_user mle-gina Gina ml-engineers rhods-users
+              add_user ops-admin Ops rhods-admins rhods-users
+              echo "Users and groups created successfully"
+              REMOTE
+              kubectl get groups 2>/dev/null || true
+{{- end }}

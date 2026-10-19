@@ -1,0 +1,96 @@
+# RBAC for the setup Jobs. The freeipa-setup ServiceAccount gets:
+#   - pods get/exec in the FreeIPA namespace (populate + CA jobs exec into the
+#     freeipa pod for kinit/ipa CLI and the CA extraction)
+#   - pods get/exec, secrets create/get, and Keycloak CR patch in the Keycloak
+#     namespace (kcadm federation job + CA secret + truststore patch)
+#   - cluster-scoped OAuth patch (the OCP groups-claim job)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: freeipa-setup
+  namespace: {{ .Values.freeipaNamespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: freeipa-setup-exec
+  namespace: {{ .Values.freeipaNamespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: freeipa-setup-exec
+  namespace: {{ .Values.freeipaNamespace }}
+subjects:
+  - kind: ServiceAccount
+    name: freeipa-setup
+    namespace: {{ .Values.freeipaNamespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: freeipa-setup-exec
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: freeipa-setup-keycloak
+  namespace: {{ .Values.keycloakNamespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["freeipa-ca"]
+    verbs: ["create", "get", "update"]
+  - apiGroups: ["k8s.keycloak.org"]
+    resources: ["keycloaks"]
+    resourceNames: ["{{ .Values.keycloakName }}"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: freeipa-setup-keycloak
+  namespace: {{ .Values.keycloakNamespace }}
+subjects:
+  - kind: ServiceAccount
+    name: freeipa-setup
+    namespace: {{ .Values.freeipaNamespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: freeipa-setup-keycloak
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: freeipa-setup-oauth
+rules:
+  - apiGroups: ["config.openshift.io"]
+    resources: ["oauths"]
+    resourceNames: ["cluster"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: freeipa-setup-oauth
+subjects:
+  - kind: ServiceAccount
+    name: freeipa-setup
+    namespace: {{ .Values.freeipaNamespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: freeipa-setup-oauth

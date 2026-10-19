@@ -1,0 +1,35 @@
+# cluster/infra/freeipa/values.yaml
+#
+# FreeIPA server deployment as plain manifests (no external chart dependency —
+# the old freeipa.github.io/helm-charts repo is dead). The server runs its
+# unattended ipa-server-install on first start; /data persists the install.
+#
+# namespace, realm, domain, hostname, password, storageClass, storageSize,
+# ingressDomain — all supplied by the bootstrap child Application.
+
+namespace: freeipa
+
+# Fedoracapital demo identity
+realm: FEDORACAPITAL.IO
+domain: fedoracapital.io
+hostname: freeipa.fedoracapital.io
+password: REPLACE_AT_APPLY # set at the one-time bootstrap apply — never committed
+
+# Storage for /data (the ipa-server-install persists here; survives restarts)
+storageClass: "" # cluster default
+storageSize: 5Gi
+
+# Route exposing the FreeIPA web UI
+ingressDomain: apps.cluster-guid.example.com
+
+image:
+  repository: quay.io/freeipa/freeipa-server
+  tag: fedora-latest
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 2Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi

@@ -1,0 +1,26 @@
+# cluster/infra/ops-ldap/values.yaml
+#
+# Post-install setup Jobs. All supplied by the bootstrap child Application:
+#   - populate Job (wave 1)     — persona users/groups in FreeIPA
+#   - CA + truststore (wave 2)  — extract the FreeIPA CA, create the Secret in the
+#                                 Keycloak namespace, patch the Keycloak CR
+#                                 spec.truststores (rhbk re-rolls)
+#   - LDAP federation (wave 3)  — kcadm.sh: LDAP user federation + group-ldap-mapper
+#                                 in the EXISTING realm + groups mapper on the OCP
+#                                 OAuth client
+#   - OAuth groups claim (wave 4) — add the "groups" claim to the OCP rhbk IdP
+# All Jobs are ArgoCD sync hooks (idempotent; re-run on every sync).
+
+freeipaNamespace: freeipa
+keycloakNamespace: keycloak
+keycloakName: keycloak # existing Keycloak CR name (rhbk operator)
+keycloakRealm: keycloak # existing realm served to OCP OAuth
+keycloakIngressHostname: sso.apps.cluster-guid.example.com
+openidClient: idp-4-ocp # existing OCP OAuth client in the realm
+oauthIdpName: rhbk # existing OCP OAuth IdP name
+
+# Fedoracapital demo identity
+realm: FEDORACAPITAL.IO
+domain: fedoracapital.io
+hostname: freeipa.fedoracapital.io
+password: REPLACE_AT_APPLY # set at the one-time bootstrap apply — never committed

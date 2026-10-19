@@ -1,0 +1,6 @@
+apiVersion: v2
+name: freeipa
+description: FreeIPA LDAP directory for the RHOAI Operations workshop
+type: application
+version: 0.1.0
+appVersion: "fedora-latest"

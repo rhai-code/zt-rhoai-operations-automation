@@ -1,0 +1,38 @@
+{{ if .Values.freeipa.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: freeipa
+  namespace: openshift-gitops
+spec:
+  project: infra
+  source:
+    repoURL: {{ .Values.freeipa.git.repoURL }}
+    targetRevision: {{ .Values.freeipa.git.targetRevision }}
+    path: {{ .Values.freeipa.git.path }}
+    helm:
+      valuesObject:
+        namespace: {{ .Values.freeipa.namespace }}
+        realm: {{ .Values.freeipa.realm }}
+        domain: {{ .Values.freeipa.domain }}
+        hostname: {{ .Values.freeipa.hostname }}
+        password: {{ .Values.freeipa.password }}
+        storageClass: {{ .Values.freeipa.storageClass }}
+        storageSize: {{ .Values.freeipa.storageSize }}
+        ingressDomain: {{ .Values.deployer.domain }}
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      enabled: true
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}

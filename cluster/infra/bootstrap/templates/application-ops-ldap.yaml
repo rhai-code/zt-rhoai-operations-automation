@@ -1,0 +1,41 @@
+{{ if .Values.opsLdap.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ops-ldap
+  namespace: openshift-gitops
+spec:
+  project: infra
+  source:
+    repoURL: {{ .Values.opsLdap.git.repoURL }}
+    targetRevision: {{ .Values.opsLdap.git.targetRevision }}
+    path: {{ .Values.opsLdap.git.path }}
+    helm:
+      valuesObject:
+        freeipaNamespace: {{ .Values.opsLdap.freeipaNamespace }}
+        keycloakNamespace: {{ .Values.opsLdap.keycloakNamespace }}
+        keycloakName: {{ .Values.opsLdap.keycloakName }}
+        keycloakRealm: {{ .Values.opsLdap.keycloakRealm }}
+        keycloakIngressHostname: {{ .Values.opsLdap.keycloakIngressHostname }}
+        openidClient: {{ .Values.opsLdap.openidClient }}
+        oauthIdpName: {{ .Values.opsLdap.oauthIdpName }}
+        realm: {{ .Values.opsLdap.realm }}
+        domain: {{ .Values.opsLdap.domain }}
+        hostname: {{ .Values.opsLdap.hostname }}
+        password: {{ .Values.opsLdap.password }}
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      enabled: true
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}

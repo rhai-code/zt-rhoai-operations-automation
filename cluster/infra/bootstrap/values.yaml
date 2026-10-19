@@ -1,0 +1,68 @@
+# cluster/infra/bootstrap/values.yaml
+#
+# App-of-apps entry chart for the infra layer. A single one-time ArgoCD Application
+# ("bootstrap-ops") points at this directory; ArgoCD renders this chart and creates
+# the AppProject + all child Applications for the enabled workloads.
+#
+# HOW TO CONTROL: set the workload flags below (or from the one-time bootstrap apply).
+#
+# The `deployer` block is injected at the one-time bootstrap apply from the live
+# cluster. The placeholders exist only so `helm template` works locally without a
+# cluster. The `freeipa.password` is likewise set at the one-time apply from the
+# shell — NEVER committed to git.
+
+# ---------------------------------------------------------------------------
+# Git defaults — applied to every child Application via the &git_defaults anchor.
+# ---------------------------------------------------------------------------
+default_settings: &git_defaults
+  repoURL: https://github.com/rhai-code/zt-rhoai-operations-automation
+  targetRevision: main
+
+# ---------------------------------------------------------------------------
+# deployer — set at the one-time bootstrap apply. Placeholders for local builds.
+# ---------------------------------------------------------------------------
+deployer:
+  domain: apps.cluster-guid.example.com
+  apiUrl: https://api.cluster-guid.example.com:6443
+
+# ---------------------------------------------------------------------------
+# freeipa — in-cluster LDAP directory, federated into the existing Keycloak.
+# Enabled by default. realm/domain/hostname are the Fedoracapital demo identity.
+# password: set at the one-time bootstrap apply (reuse the existing lab admin
+# password) — never in git.
+# ---------------------------------------------------------------------------
+freeipa:
+  enabled: true
+  git:
+    path: cluster/infra/freeipa
+    <<: *git_defaults
+  namespace: freeipa
+  realm: FEDORACAPITAL.IO
+  domain: fedoracapital.io
+  hostname: freeipa.fedoracapital.io
+  password: REPLACE_AT_APPLY # set at the one-time apply — never committed
+  storageClass: "" # cluster default (ocs-external-storagecluster-ceph-rbd)
+  storageSize: 5Gi
+  ingressDomain: apps.cluster-guid.example.com # from deployer.domain at apply time
+
+# ---------------------------------------------------------------------------
+# opsLdap — post-install setup Jobs: persona population, FreeIPA CA + Keycloak
+# truststore, LDAP user federation + group mapper into the existing Keycloak
+# realm, and the OCP OAuth groups claim. Enabled by default.
+# ---------------------------------------------------------------------------
+opsLdap:
+  enabled: true
+  git:
+    path: cluster/infra/ops-ldap
+    <<: *git_defaults
+  freeipaNamespace: freeipa
+  keycloakNamespace: keycloak
+  keycloakName: keycloak # existing Keycloak CR name (rhbk operator)
+  keycloakRealm: keycloak # existing realm served to OCP OAuth
+  keycloakIngressHostname: sso.apps.cluster-guid.example.com # from deployer.domain
+  openidClient: idp-4-ocp # existing OCP OAuth client in the realm
+  oauthIdpName: rhbk # existing OCP OAuth IdP name
+  realm: FEDORACAPITAL.IO
+  domain: fedoracapital.io
+  hostname: freeipa.fedoracapital.io
+  password: REPLACE_AT_APPLY # set at the one-time apply — never committed

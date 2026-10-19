@@ -1,0 +1,17 @@
+# The freeipa-server container runs systemd as root and mounts /sys/fs/cgroup
+# (hostPath) — this needs the hostmount-anyuid SCC (anyuid alone does not allow
+# hostPath). Default capabilities (which include NET_BIND_SERVICE for LDAP 389,
+# HTTPS 443, Kerberos 88, DNS 53) suffice; SYS_TIME is not needed (--no-ntp).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: system:scc:hostmount-anyuid
+  namespace: {{ .Values.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:scc:hostmount-anyuid
+subjects:
+  - kind: ServiceAccount
+    name: freeipa
+    namespace: {{ .Values.namespace }}

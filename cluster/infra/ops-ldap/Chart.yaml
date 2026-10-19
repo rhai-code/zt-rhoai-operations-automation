@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ops-ldap
+description: Post-install identity setup Jobs for the RHOAI Operations workshop (persona population, CA + truststore, LDAP federation into the existing Keycloak, OCP OAuth groups claim)
+type: application
+version: 0.1.0
