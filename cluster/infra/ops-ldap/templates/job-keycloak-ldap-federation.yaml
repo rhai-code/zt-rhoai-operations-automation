@@ -53,7 +53,7 @@ spec:
               ADMIN_USER=$(kubectl get secret "$KEYCLOAK_NAME-initial-admin" -n "$KEYCLOAK_NS" -o jsonpath='{.data.username}' | base64 -d)
               ADMIN_PASSWORD=$(kubectl get secret "$KEYCLOAK_NAME-initial-admin" -n "$KEYCLOAK_NS" -o jsonpath='{.data.password}' | base64 -d)
               KC="kubectl exec -n $KEYCLOAK_NS $KEYCLOAK_NAME-0 -- /opt/keycloak/bin/kcadm.sh"
-              $KC config credentials --server http://localhost:8080 --realm master --user "$ADMIN_USER" --password "$ADMIN_PASSWORD"
+              $KC config credentials --server https://localhost:8443 --insecure --realm master --user "$ADMIN_USER" --password "$ADMIN_PASSWORD"
               if $KC get user-federations/ldap -r "$REALM" 2>/dev/null | grep -q '"name"\s*:\s*"freeipa-ldap"'; then
                 echo "LDAP federation freeipa-ldap already exists"
               else
