@@ -1,0 +1,17 @@
+# RHOAI Administrators group — created by the RHOAI operator on install and
+# deleted during the Module 2 teardown. Restored with the exact operator
+# metadata (platform.opendatahub.io annotations/labels) so the operator
+# recognizes it. Git-owned: the ldap-group-sync cronjob whitelists persona
+# groups only, so nothing fights this resource over users. ops-admin mirrors
+# IPA membership (uid=ops-admin in cn=rhods-admins) — update here when IPA
+# membership changes.
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  annotations:
+    platform.opendatahub.io/type: OpenShift AI Self-Managed
+  labels:
+    platform.opendatahub.io/part-of: auth
+  name: rhods-admins
+users:
+  - ops-admin
