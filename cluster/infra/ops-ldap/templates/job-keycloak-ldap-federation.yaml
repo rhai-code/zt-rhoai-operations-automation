@@ -52,7 +52,7 @@ spec:
               fi
               ADMIN_USER=$(kubectl get secret "$KEYCLOAK_NAME-initial-admin" -n "$KEYCLOAK_NS" -o jsonpath='{.data.username}' | base64 -d)
               ADMIN_PASSWORD=$(kubectl get secret "$KEYCLOAK_NAME-initial-admin" -n "$KEYCLOAK_NS" -o jsonpath='{.data.password}' | base64 -d)
-              KC="kubectl exec -n $KEYCLOAK_NS $KEYCLOAK_NAME-0 -- /opt/keycloak/bin/kcadm.sh --config /tmp/kcadm.config"
+              KC="kubectl exec -n $KEYCLOAK_NS $KEYCLOAK_NAME-0 -- env HOME=/tmp /opt/keycloak/bin/kcadm.sh"
               # Trust the Keycloak TLS cert (PEM import via keytool into a writable Java truststore)
               # delete-then-import keeps this idempotent (the truststore persists in the pod's /tmp)
               kubectl exec -n $KEYCLOAK_NS $KEYCLOAK_NAME-0 -- bash -c "keytool -delete -alias keycloak-tls -keystore /tmp/keycloak-ts.jks -storepass changeit >/dev/null 2>&1; keytool -importcert -file /mnt/certificates/tls.crt -keystore /tmp/keycloak-ts.jks -storepass changeit -noprompt -alias keycloak-tls"
