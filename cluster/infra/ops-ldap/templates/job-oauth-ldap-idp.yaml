@@ -2,6 +2,11 @@
 # the OCP OAuth against FreeIPA (ldaps://636, memberOf filter scoping users to
 # the rhods-users group). Personas auth via the LDAP IdP; the admin user continues
 # to auth via the existing Keycloak IdP (rhbk). Idempotent (name check).
+# IMPORTANT: the LDAP IdP is kept FIRST in the identityProviders list. With
+# multiple IdPs, oc login --username/--password tries providers in order, and a
+# failed OIDC password grant (user not in Keycloak) is an error — not an
+# invalid-credentials failure — which aborts the request before the LDAP
+# provider is ever tried.
 {{- if .Values.password }}
 apiVersion: batch/v1
 kind: Job
@@ -37,11 +42,25 @@ spec:
               oc create secret generic freeipa-ldap-bind-password \
                 --from-literal=bindPassword="$FREEIPA_PASSWORD" \
                 -n openshift-config --dry-run=client -o yaml | oc apply -f -
-              if oc get oauth cluster -o json 2>/dev/null | grep -q '"name"\s*:\s*"freeipa-ldap"'; then
-                echo "LDAP identity provider freeipa-ldap already configured"
-              else
+              LDAP_IDP='{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["displayName"],"preferredUsername":["uid"]},"bindDN":"uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io","bindPassword":{"name":"freeipa-ldap-bind-password"},"ca":{"name":"freeipa-ca"},"insecure":false,"url":"ldaps://freeipa.freeipa.svc.cluster.local:636/dc=fedoracapital,dc=io?uid?sub?(memberOf=cn=rhods-users,cn=groups,cn=accounts,dc=fedoracapital,dc=io)"},"mappingMethod":"claim","name":"freeipa-ldap","type":"LDAP"}'
+              IDX=""
+              i=0
+              NAMES=$(oc get oauth cluster -o jsonpath='{.spec.identityProviders[*].name}')
+              for name in $NAMES; do
+                if [ "$name" = "freeipa-ldap" ]; then IDX=$i; fi
+                i=$((i+1))
+              done
+              if [ -z "$NAMES" ]; then
                 echo "Adding the LDAP identity provider freeipa-ldap to the OCP OAuth"
-                oc patch oauth cluster --type=json -p '[{"op":"add","path":"/spec/identityProviders/-","value":{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["displayName"],"preferredUsername":["uid"]},"bindDN":"uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io","bindPassword":{"name":"freeipa-ldap-bind-password"},"ca":{"name":"freeipa-ca"},"insecure":false,"url":"ldaps://freeipa.freeipa.svc.cluster.local:636/dc=fedoracapital,dc=io?uid?sub?(memberOf=cn=rhods-users,cn=groups,cn=accounts,dc=fedoracapital,dc=io)"},"mappingMethod":"claim","name":"freeipa-ldap","type":"LDAP"}}]'
+                oc patch oauth cluster --type=json -p "[{\"op\":\"add\",\"path\":\"/spec/identityProviders\",\"value\":[$LDAP_IDP]}]"
+              elif [ -z "$IDX" ]; then
+                echo "Prepending the LDAP identity provider freeipa-ldap to the OCP OAuth"
+                oc patch oauth cluster --type=json -p "[{\"op\":\"add\",\"path\":\"/spec/identityProviders/0\",\"value\":$LDAP_IDP}]"
+              elif [ "$IDX" != "0" ]; then
+                echo "Moving the LDAP identity provider freeipa-ldap to the first position"
+                oc patch oauth cluster --type=json -p "[{\"op\":\"remove\",\"path\":\"/spec/identityProviders/$IDX\"},{\"op\":\"add\",\"path\":\"/spec/identityProviders/0\",\"value\":$LDAP_IDP}]"
+              else
+                echo "LDAP identity provider freeipa-ldap already first in the OCP OAuth"
               fi
               for i in $(seq 1 40); do
                 STATUS=$(oc rollout status deployment/oauth-openshift -n openshift-authentication --timeout=30s 2>/dev/null | tail -1 || true)
