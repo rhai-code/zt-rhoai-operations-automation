@@ -54,7 +54,11 @@ spec:
               add_group rhods-users               "RHOAI Users"
               add_user() {
                 local u="\$1"; local first="\$2"; shift 2
-                ipa user-show "\$u" >/dev/null 2>&1 || printf '%s\n%s\n' '{{ .Values.password }}' '{{ .Values.password }}' | ipa user-add "\$u" --first="\$first" --last=Workshop --password
+                if ! ipa user-show "\$u" >/dev/null 2>&1; then
+                  printf '%s\n%s\n' '{{ .Values.password }}' '{{ .Values.password }}' | ipa user-add "\$u" --first="\$first" --last=Workshop --password
+                  # ipa user-add --password leaves the password expired — un-expire
+                  ipa user-mod "\$u" --setattr=krbPasswordExpiration=20371231000000Z
+                fi
                 local g
                 for g in "\$@"; do ipa group-add-member "\$g" --users="\$u" || true; done
               }
