@@ -49,7 +49,7 @@ spec:
               }'
               for i in $(seq 1 120); do
                 READY=$(kubectl get pod {{ .Values.keycloakName }}-0 -n {{ .Values.keycloakNamespace }} -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || true)
-                TS=$(kubectl exec -n {{ .Values.keycloakNamespace }} {{ .Values.keycloakName }}-0 -- test -f /opt/keycloak/conf/truststores/ca.crt >/dev/null 2>&1 && echo yes || echo no)
+                TS=$(kubectl exec -n {{ .Values.keycloakNamespace }} {{ .Values.keycloakName }}-0 -- test -f /opt/keycloak/conf/truststores/secret-freeipa-ca/ca.crt >/dev/null 2>&1 && echo yes || echo no)
                 if [ "$READY" = "true" ] && [ "$TS" = "yes" ]; then
                   echo "Keycloak re-rolled with the truststore"; break
                 fi
