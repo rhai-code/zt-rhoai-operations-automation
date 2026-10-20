@@ -1,6 +1,8 @@
 # OCP-native LDAP identity provider (type: LDAP) — adds the freeipa-ldap IdP to
-# the OCP OAuth against FreeIPA (ldaps://636, memberOf filter scoping users to
-# the rhods-users group). Personas auth via the LDAP IdP; the admin user continues
+# the OCP OAuth against FreeIPA (ldaps://636, no memberOf filter: EVERY directory
+# user can log in to OpenShift — OpenShift is the platform layer). RHOAI access is
+# a separate gate: the Auth CR's allowedGroups/adminGroups (rhods-users/rhods-admins)
+# decides who can use RHOAI. Personas auth via the LDAP IdP; the admin user continues
 # to auth via the existing Keycloak IdP (rhbk). Idempotent (name check).
 # IMPORTANT: the LDAP IdP is kept FIRST in the identityProviders list. With
 # multiple IdPs, oc login --username/--password tries providers in order, and a
@@ -42,7 +44,7 @@ spec:
               oc create secret generic freeipa-ldap-bind-password \
                 --from-literal=bindPassword="$FREEIPA_PASSWORD" \
                 -n openshift-config --dry-run=client -o yaml | oc apply -f -
-              LDAP_IDP='{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["displayName"],"preferredUsername":["uid"]},"bindDN":"uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io","bindPassword":{"name":"freeipa-ldap-bind-password"},"ca":{"name":"freeipa-ca"},"insecure":false,"url":"ldaps://freeipa.freeipa.svc.cluster.local:636/dc=fedoracapital,dc=io?uid?sub?(memberOf=cn=rhods-users,cn=groups,cn=accounts,dc=fedoracapital,dc=io)"},"mappingMethod":"claim","name":"freeipa-ldap","type":"LDAP"}'
+              LDAP_IDP='{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["displayName"],"preferredUsername":["uid"]},"bindDN":"uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io","bindPassword":{"name":"freeipa-ldap-bind-password"},"ca":{"name":"freeipa-ca"},"insecure":false,"url":"ldaps://freeipa.freeipa.svc.cluster.local:636/dc=fedoracapital,dc=io?uid?sub"},"mappingMethod":"claim","name":"freeipa-ldap","type":"LDAP"}'
               IDX=""
               i=0
               NAMES=$(oc get oauth cluster -o jsonpath='{.spec.identityProviders[*].name}')
