@@ -6,7 +6,7 @@ metadata:
   name: infra
   namespace: openshift-gitops
 spec:
-  description: Infra layer of the RHOAI Operations workshop (LDAP directory + identity setup + MaaS model)
+  description: Infra layer of the RHOAI Operations workshop (LDAP directory + identity setup + MaaS model + MLflow)
   sourceRepos:
     - https://github.com/rhai-code/zt-rhoai-operations-automation
   destinations:
@@ -27,6 +27,13 @@ spec:
     # Group needs it whitelisted (the namespace '*' whitelist doesn't apply)
     - group: user.openshift.io
       kind: Group
+    # MLflow: the cluster-scoped MLflow instance CR and the DataScienceCluster
+    # patch that enables the mlflowoperator component (both cluster-scoped —
+    # the namespace '*' whitelist doesn't apply)
+    - group: mlflow.opendatahub.io
+      kind: MLflow
+    - group: datasciencecluster.opendatahub.io
+      kind: DataScienceCluster
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"

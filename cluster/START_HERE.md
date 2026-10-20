@@ -108,30 +108,41 @@ developer — logs in to OpenShift fine and gets the RHOAI "Access denied" page.
 
 ```
 cluster/
-└── infra/
-    ├── bootstrap/                          # app-of-apps entry chart
-    │   ├── values.yaml                     # workload flags + git defaults (heavily commented)
-    │   └── templates/
-    │       ├── appproject-infra.yaml
-    │       ├── application-freeipa.yaml
-    │       └── application-ops-ldap.yaml
-    ├── freeipa/                            # FreeIPA server (plain manifests)
-    │   ├── values.yaml
-    │   └── templates/
-    │       ├── namespace.yaml, serviceaccount.yaml, scc.yaml
-    │       ├── machineconfig.yaml          # SELinux container_manage_cgroup (node reboot)
-    │       ├── statefulset.yaml            # startupProbe survives the 15+ min install
-    │       └── service.yaml, route.yaml
-    └── ops-ldap/                           # identity setup (hooks + workload)
-        ├── values.yaml
-        └── templates/
-            ├── rbac.yaml                   # freeipa-setup SA (focused RBAC)
-            ├── populate-job.yaml           # wave 1 — personas in FreeIPA
-            ├── job-ca.yaml                 # wave 2 — CA → ConfigMap (IdP ca ref)
-            ├── job-oauth-ldap-idp.yaml     # wave 3 — OCP-native LDAP IdP
-            ├── job-oauth-groups-claim.yaml # wave 4 — groups claim on rhbk IdP
-            ├── job-ldap-groups-sync.yaml   # CronJob — oc adm groups sync
-            └── group-rhods-admins.yaml     # rhods-admins Group (operator metadata)
+├── infra/
+│   ├── bootstrap/                          # app-of-apps entry chart
+│   │   ├── values.yaml                     # workload flags + git defaults (heavily commented)
+│   │   └── templates/
+│   │       ├── appproject-infra.yaml
+│   │       ├── application-freeipa.yaml
+│   │       ├── application-ops-ldap.yaml
+│   │       ├── application-maas-model.yaml
+│   │       └── application-mlflow.yaml
+│   ├── freeipa/                            # FreeIPA server (plain manifests)
+│   │   ├── values.yaml
+│   │   └── templates/
+│   │       ├── namespace.yaml, serviceaccount.yaml, scc.yaml
+│   │       ├── machineconfig.yaml          # SELinux container_manage_cgroup (node reboot)
+│   │       ├── statefulset.yaml            # startupProbe survives the 15+ min install
+│   │       └── service.yaml, route.yaml
+│   └── ops-ldap/                           # identity setup (hooks + workload)
+│       ├── values.yaml
+│       └── templates/
+│           ├── rbac.yaml                   # freeipa-setup SA (focused RBAC)
+│           ├── populate-job.yaml           # wave 1 — personas in FreeIPA
+│           ├── job-ca.yaml                 # wave 2 — CA → ConfigMap (IdP ca ref)
+│           ├── job-oauth-ldap-idp.yaml     # wave 3 — OCP-native LDAP IdP
+│           ├── job-oauth-groups-claim.yaml # wave 4 — groups claim on rhbk IdP
+│           ├── job-ldap-groups-sync.yaml   # CronJob — oc adm groups sync
+│           └── group-rhods-admins.yaml     # rhods-admins Group (operator metadata)
+├── maas-model/                             # Lending model via MaaS (Module 2 Ex 6)
+│   ├── kustomization.yaml
+│   ├── llminferenceservice.yaml
+│   └── maasmodelref.yaml
+└── mlflow/                                 # MLflow instance (Module 3 tracking)
+    ├── kustomization.yaml
+    ├── dsc-patch.yaml                      # enables the mlflowoperator DSC component
+    ├── mlflow-sa.yaml                      # the CR's serviceAccountName (operator doesn't create it)
+    └── mlflow.yaml                         # cluster-scoped MLflow instance CR
 ```
 
 ---
@@ -142,6 +153,8 @@ cluster/
 |----------|-----------|---------|
 | `freeipa` | `freeipa` | In-cluster LDAP directory (FEDORACAPITAL.IO), plain-manifest StatefulSet |
 | `opsLdap` | `opsLdap` | Identity setup: persona population, CA, OCP LDAP IdP, groups claim, group sync |
+| `maasModel` | `maasModel` | Lending model via MaaS (LLMInferenceService + MaaSModelRef in rhoai-lending), Module 2 Ex 6 |
+| `mlflow` | `mlflow` | MLflow instance (sqlite + 20Gi PVC) + mlflowoperator DSC component, Module 3 tracking |
 
 ---
 

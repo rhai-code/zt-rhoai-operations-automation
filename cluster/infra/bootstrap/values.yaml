@@ -79,3 +79,20 @@ maasModel:
   git:
     path: cluster/maas-model
     <<: *git_defaults
+
+# ---------------------------------------------------------------------------
+# mlflow — the cluster-scoped MLflow instance (experiment tracking server) in
+# redhat-ods-applications. Pre-setup for Module 3: the custom workbench image
+# ships mlflow-skinny and the labs track experiments against this server
+# (https://mlflow.redhat-ods-applications.svc:8443/mlflow). The app also
+# enables the mlflowoperator DSC component (lab clusters ship it Removed) —
+# the operator then installs the MLflow CRDs, and the instance CR deploys the
+# server (sqlite backend + 20Gi PVC). The app creates the mlflow-sa service
+# account the instance references — the operator does NOT create it.
+# ---------------------------------------------------------------------------
+mlflow:
+  enabled: true
+  git:
+    path: cluster/mlflow
+    <<: *git_defaults
+  namespace: redhat-ods-applications

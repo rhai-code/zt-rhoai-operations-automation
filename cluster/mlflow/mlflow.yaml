@@ -1,0 +1,29 @@
+---
+# The cluster-scoped MLflow instance — exactly one per cluster, MUST be named
+# `mlflow`, lands in redhat-ods-applications. sqlite backend + 20Gi PVC; the
+# tracking URI is https://mlflow.redhat-ods-applications.svc:8443/mlflow.
+# Verbatim from gitops-clusters applications/rhoai/overlay/mlflow/mlflow.yaml.
+apiVersion: mlflow.opendatahub.io/v1
+kind: MLflow
+metadata:
+  name: mlflow
+spec:
+  artifactsDestination: file:///mlflow/artifacts
+  backendStoreUri: sqlite:////mlflow/mlflow.db
+  replicas: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"
+  serveArtifacts: true
+  serviceAccountName: mlflow-sa
+  storage:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 20Gi
+  workers: 1

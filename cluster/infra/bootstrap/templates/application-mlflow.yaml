@@ -1,0 +1,38 @@
+{{ if .Values.mlflow.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlflow
+  namespace: openshift-gitops
+spec:
+  project: infra
+  source:
+    repoURL: {{ .Values.mlflow.git.repoURL }}
+    targetRevision: {{ .Values.mlflow.git.targetRevision }}
+    path: {{ .Values.mlflow.git.path }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.mlflow.namespace }}
+  syncPolicy:
+    automated:
+      enabled: true
+      # selfHeal keeps the DSC component Managed even if something re-applies
+      # the DataScienceCluster without it (lab clusters ship it Removed).
+      selfHeal: true
+    syncOptions:
+      # ServerSideApply (kubectl apply --server-side --force-conflicts) makes
+      # the DSC patch own ONLY its mlflowoperator component key — the rest of
+      # the DataScienceCluster stays owned by the cluster provisioning.
+      - ServerSideApply=true
+      # The MLflow CRD is NOT part of the sync: the mlflowoperator installs it
+      # in response to the DSC patch (~15s). SkipDryRunOnMissingResource +
+      # retry bridge the gap; the CR applies once the CRD exists.
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}
