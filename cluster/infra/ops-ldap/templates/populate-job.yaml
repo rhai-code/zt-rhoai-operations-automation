@@ -4,6 +4,7 @@
 #   lending LOB:   own-alice (owner), ste-carol (steward), sci-eve (scientist)
 #   insurance LOB: own-bob (owner),  ste-dave (steward),  sci-frank (scientist)
 #   platform:      mle-gina (ML engineer), ops-admin (platform admin)
+#   non-RHOAI:     dev-nia (developer -- NOT in rhods-users, the Auth CR denial-path persona)
 {{- if .Values.password }}
 apiVersion: batch/v1
 kind: Job
@@ -70,6 +71,7 @@ spec:
               add_user sci-frank Frank insurance-data-scientists rhods-users
               add_user mle-gina Gina ml-engineers rhods-users
               add_user ops-admin Ops rhods-admins rhods-users
+              add_user dev-nia Nia
               echo "Users and groups created successfully"
               REMOTE
               kubectl get groups 2>/dev/null || true
