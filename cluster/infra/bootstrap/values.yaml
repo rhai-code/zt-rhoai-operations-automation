@@ -26,10 +26,10 @@ deployer:
   apiUrl: https://api.cluster-guid.example.com:6443
 
 # ---------------------------------------------------------------------------
-# freeipa — in-cluster LDAP directory, federated into the existing Keycloak.
-# Enabled by default. realm/domain/hostname are the Fedoracapital demo identity.
-# password: set at the one-time bootstrap apply (reuse the existing lab admin
-# password) — never in git.
+# freeipa — in-cluster LDAP directory, wired into OpenShift via the OCP-native
+# LDAP identity provider. Enabled by default. realm/domain/hostname are the
+# Fedoracapital demo identity. password: set at the one-time bootstrap apply
+# (reuse the existing lab admin password) — never in git.
 # ---------------------------------------------------------------------------
 freeipa:
   enabled: true
@@ -46,10 +46,11 @@ freeipa:
   ingressDomain: apps.cluster-guid.example.com # from deployer.domain at apply time
 
 # ---------------------------------------------------------------------------
-# opsLdap — post-install setup Jobs: persona population, the FreeIPA CA for the
-# OCP-native LDAP identity provider, and the OCP-native LDAP IdP (type: LDAP)
-# against FreeIPA (ldaps://636, memberOf filter). Personas auth via the LDAP IdP;
-# the admin user continues to auth via the existing Keycloak IdP (rhbk).
+# opsLdap — post-install identity setup: persona population, the FreeIPA CA for
+# the OCP-native LDAP identity provider, the OCP-native LDAP IdP (type: LDAP)
+# against FreeIPA (ldaps://636, no memberOf filter — every directory user can
+# log in to OpenShift; RHOAI access is the Auth CR's gate), the groups claim on
+# the existing Keycloak IdP (rhbk), and the scheduled LDAP group sync.
 # Enabled by default.
 # ---------------------------------------------------------------------------
 opsLdap:

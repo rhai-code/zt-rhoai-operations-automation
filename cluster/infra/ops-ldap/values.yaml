@@ -1,16 +1,19 @@
 # cluster/infra/ops-ldap/values.yaml
 #
-# Post-install identity setup Jobs. All supplied by the bootstrap child Application:
+# Post-install identity setup. All supplied by the bootstrap child Application:
 #   - populate (wave 1)       — persona users/groups in FreeIPA
-#   - freeipa-ca (wave 2)     — FreeIPA CA → Secret in ns openshift-config for the
+#   - freeipa-ca (wave 2)     — FreeIPA CA → ConfigMap in ns openshift-config for the
 #                               OCP-native LDAP IdP's `ca` ref
 #   - oauth-ldap-idp (wave 3) — OCP-native LDAP identity provider (type: LDAP) on
-#                               the OCP OAuth against FreeIPA (ldaps://636,
-#                               memberOf filter scoping users to rhods-users).
+#                               the OCP OAuth against FreeIPA (ldaps://636, no
+#                               memberOf filter: EVERY directory user can log in
+#                               to OpenShift — OpenShift is the platform layer).
 #                               Personas auth via the LDAP IdP; the admin user
 #                               continues to auth via the existing Keycloak IdP (rhbk)
 #   - oauth-groups-claim (wave 4) — the groups claim on the existing Keycloak IdP
-# All Jobs are ArgoCD sync hooks (idempotent; re-run on every sync).
+#   - ldap-group-sync (CronJob)   — oc adm groups sync, lands the persona groups
+#   - group-rhods-admins          — rhods-admins Group (operator metadata, Git-owned)
+# All wave Jobs are ArgoCD sync hooks (idempotent; re-run on every sync).
 
 freeipaNamespace: freeipa
 oauthIdpName: rhbk # existing Keycloak (rhbk) IdP name — needed for the admin user

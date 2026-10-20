@@ -2,7 +2,8 @@
 
 The `cluster/` directory manages the workshop's infra as GitOps — an app-of-apps
 entry chart that ArgoCD renders into child Applications. Currently the infra
-layer only: an in-cluster LDAP directory federated into the EXISTING Keycloak.
+layer only: an in-cluster FreeIPA directory wired into OpenShift via the
+OCP-native LDAP identity provider.
 
 ---
 
@@ -35,7 +36,6 @@ spec:
           ingressDomain: apps.cluster-jt286.dyn.redhatworkshops.io
         opsLdap:
           password: <same>
-          keycloakIngressHostname: sso.apps.cluster-jt286.dyn.redhatworkshops.io
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-gitops
@@ -67,32 +67,40 @@ bootstrap-ops Application (one-time, applied by hand)
         ├── AppProject: infra
         ├── freeipa Application            (cluster/infra/freeipa/)
         └── ops-ldap Application           (cluster/infra/ops-ldap/)
-              hooks run in wave order:
-              ├── wave 1  freeipa-populate            (persona users/groups)
-              ├── wave 2  freeipa-ca-truststore       (CA → Keycloak CR truststore)
-              ├── wave 3  keycloak-ldap-federation    (LDAP user federation + group mapper)
-              └── wave 4  oauth-groups-claim          (OCP rhbk IdP groups claim)
+              ├── sync hooks (wave order, idempotent, re-run on every sync):
+              │   ├── wave 1  freeipa-populate    (persona users/groups in FreeIPA)
+              │   ├── wave 2  freeipa-ca          (FreeIPA CA → ConfigMap, IdP ca ref)
+              │   ├── wave 3  oauth-ldap-idp      (OCP-native LDAP IdP, prepended first)
+              │   └── wave 4  oauth-groups-claim  (groups claim on the existing rhbk IdP)
+              ├── normal workload:
+              │   └── ldap-group-sync CronJob     (oc adm groups sync, wave 5)
+              └── plain manifest:
+                  └── group-rhods-admins Group    (operator metadata, Git-owned)
 ```
 
-The `freeipa` Application syncs as a normal workload; the `ops-ldap` Jobs are
-ArgoCD sync hooks — idempotent, re-run on every sync, and each poll-waits for
-its dependencies (FreeIPA ready, Keycloak re-rolled).
+The `freeipa` Application syncs as a normal workload. The wave 1–4 Jobs are
+ArgoCD sync hooks — each poll-waits for its dependency (FreeIPA ready).
+`ldap-group-sync` is a CronJob that re-runs on schedule, keeping the OpenShift
+groups in step with FreeIPA membership.
 
 ---
 
-## Demo story
-
-Organisations federate LDAP into their IdP — that is what most orgs use:
+## Identity design (two gates)
 
 ```
 FreeIPA (ns freeipa, realm FEDORACAPITAL.IO, domain fedoracapital.io)
-   ← LDAP user federation + group-ldap-mapper (EXISTING rhbk realm `keycloak`)
-   → idp-4-ocp client: groups mapper → JWT "groups" claim
-   → OCP OAuth rhbk IdP: "groups" added to claims → OCP users + groups
+   → OCP-native LDAP IdP (freeipa-ldap, ldaps://636, no memberOf filter)
+     → EVERY directory user can log in to OpenShift (the platform layer)
+   → ldap-group-sync CronJob (oc adm groups sync, RFC2307bis)
+     → persona groups land in OpenShift with their members
+   → the existing rhbk (Keycloak) IdP stays for the platform admin
+     → wave 4 adds the groups claim to it (JWT groups apply as OpenShift groups)
 ```
 
-No OCP-native LDAP IdP, no `oc adm groups sync`, no second Keycloak — the
-existing rhbk (pre-set by the provisioning) is the single IdP.
+RHOAI access is a SEPARATE gate from OpenShift login: the Auth CR's
+`allowedGroups` (`rhods-users`) and `adminGroups` (`rhods-admins`) decide who
+can use RHOAI. A directory user not in `rhods-users` — e.g. the `dev-nia`
+developer — logs in to OpenShift fine and gets the RHOAI "Access denied" page.
 
 ---
 
@@ -111,16 +119,19 @@ cluster/
     │   ├── values.yaml
     │   └── templates/
     │       ├── namespace.yaml, serviceaccount.yaml, scc.yaml
+    │       ├── machineconfig.yaml          # SELinux container_manage_cgroup (node reboot)
     │       ├── statefulset.yaml            # startupProbe survives the 15+ min install
-    │       ├── service.yaml, route.yaml
-    └── ops-ldap/                           # setup Jobs (ArgoCD sync hooks)
+    │       └── service.yaml, route.yaml
+    └── ops-ldap/                           # identity setup (hooks + workload)
         ├── values.yaml
         └── templates/
             ├── rbac.yaml                   # freeipa-setup SA (focused RBAC)
-            ├── populate-job.yaml
-            ├── job-ca-truststore.yaml
-            ├── job-keycloak-ldap-federation.yaml
-            └── job-oauth-groups-claim.yaml
+            ├── populate-job.yaml           # wave 1 — personas in FreeIPA
+            ├── job-ca.yaml                 # wave 2 — CA → ConfigMap (IdP ca ref)
+            ├── job-oauth-ldap-idp.yaml     # wave 3 — OCP-native LDAP IdP
+            ├── job-oauth-groups-claim.yaml # wave 4 — groups claim on rhbk IdP
+            ├── job-ldap-groups-sync.yaml   # CronJob — oc adm groups sync
+            └── group-rhods-admins.yaml     # rhods-admins Group (operator metadata)
 ```
 
 ---
@@ -130,28 +141,33 @@ cluster/
 | Workload | Values key | Purpose |
 |----------|-----------|---------|
 | `freeipa` | `freeipa` | In-cluster LDAP directory (FEDORACAPITAL.IO), plain-manifest StatefulSet |
-| `opsLdap` | `opsLdap` | Setup hooks: persona population, CA + truststore, LDAP federation, OAuth groups claim |
+| `opsLdap` | `opsLdap` | Identity setup: persona population, CA, OCP LDAP IdP, groups claim, group sync |
 
 ---
 
 ## Secrets
 
-Nothing in git. The FreeIPA admin/ds password (also the LDAP bind password) is
-set at the one-time bootstrap apply from the shell — it rides the bootstrap
-Application's on-cluster helm.values through to the child Applications. The
-Keycloak admin credentials are read from the rhbk operator's
-`keycloak-initial-admin` Secret by the federation job.
+Nothing in git. The FreeIPA admin/ds password (also the LDAP bind password —
+the `oauth-ldap-idp` job creates the `freeipa-ldap-bind-password` Secret from
+it) is set at the one-time bootstrap apply from the shell — it rides the
+bootstrap Application's on-cluster helm.values through to the child
+Applications. The Keycloak (rhbk) realm is pre-set by the cluster provisioning
+and is only used for the platform admin — no federation, no Keycloak admin
+credentials needed here.
 
 ## Verification (after sync)
 
 ```bash
 oc -n openshift-gitops get applications.argoproj.io
 oc -n freeipa get pods,routes                       # FreeIPA healthy (15+ min install)
-oc -n keycloak get keycloak keycloak -o jsonpath='{.spec.truststores}'
-oc -n freeipa logs -l job-name=keycloak-ldap-federation   # federation configured
-oc get oauth cluster -o jsonpath='{.spec.identityProviders[0].openID.claims}'
-oc get groups                                       # Fedoracapital persona groups
+oc get oauth cluster -o jsonpath='{range .spec.identityProviders[*]}{.name}{"\t"}{.type}{"\n"}{end}'
+                                                    # freeipa-ldap first (LDAP), rhbk second
+oc get groups                                       # persona groups (via ldap-group-sync)
+oc -n freeipa get cronjob ldap-group-sync           # group sync schedule
 ```
 
-Persona login (own-alice, ste-carol, …) via the dashboard lands through
-OCP → rhbk → LDAP. `oc get groups` shows the persona groups sourced via claims.
+Persona login (own-alice, ste-carol, …) via the console lands through
+**freeipa-ldap** — every directory user can log in to OpenShift; groups come
+from the `ldap-group-sync` CronJob. RHOAI access is the Auth CR's call:
+`rhods-users` reaches the dashboard, `rhods-admins` administers it, and
+`dev-nia` (not in `rhods-users`) gets the Access denied page.

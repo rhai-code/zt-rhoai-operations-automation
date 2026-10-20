@@ -62,7 +62,8 @@ spec:
                 echo "Moving the LDAP identity provider freeipa-ldap to the first position"
                 oc patch oauth cluster --type=json -p "[{\"op\":\"remove\",\"path\":\"/spec/identityProviders/$IDX\"},{\"op\":\"add\",\"path\":\"/spec/identityProviders/0\",\"value\":$LDAP_IDP}]"
               else
-                echo "LDAP identity provider freeipa-ldap already first in the OCP OAuth"
+                echo "Replacing the LDAP identity provider freeipa-ldap with the desired config"
+                oc patch oauth cluster --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/identityProviders/0\",\"value\":$LDAP_IDP}]"
               fi
               for i in $(seq 1 40); do
                 STATUS=$(oc rollout status deployment/oauth-openshift -n openshift-authentication --timeout=30s 2>/dev/null | tail -1 || true)
