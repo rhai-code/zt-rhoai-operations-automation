@@ -1,0 +1,11 @@
+# Publishes the Lending model through MaaS -- makes it appear in /maas-api/v1/models.
+# Must live in the SAME namespace as the LLMInferenceService it references.
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSModelRef
+metadata:
+  name: qwen25-05b-maas
+  namespace: rhoai-lending
+spec:
+  modelRef:
+    kind: LLMInferenceService
+    name: qwen25-05b-maas

@@ -1,0 +1,81 @@
+# The Lending line-of-business model, published through MaaS.
+#
+# MaaS governs models served as an LLMInferenceService (the gateway-native KServe
+# serving object) — MaaSModelRef.spec.modelRef.kind only accepts LLMInferenceService
+# or ExternalModel. This deploys qwen2.5-0.5b as an LLMInferenceService wired to the
+# MaaS gateway via spec.router.gateway.refs, so the performance-tier and standard-tier
+# subscriptions in this directory have a model to publish.
+#
+# The OpenAI model id is spec.model.name ("qwen25-05b"). Weights come from the OCI
+# modelcar, so the model loads from the mirrored registry on a disconnected cluster —
+# no Hugging Face reach-out.
+apiVersion: serving.kserve.io/v1alpha1
+kind: LLMInferenceService
+metadata:
+  name: qwen25-05b-maas
+  namespace: rhoai-lending
+  labels:
+    opendatahub.io/dashboard: "true"
+spec:
+  model:
+    uri: "oci://quay.io/redhat-ai-services/modelcar-catalog:qwen2.5-0.5b-instruct"
+    name: qwen25-05b
+  replicas: 1
+  router:
+    route: {}
+    # Attach to the MaaS-enabled gateway (platform-level prerequisite).
+    gateway:
+      refs:
+        - name: maas-default-gateway
+          namespace: openshift-ingress
+  template:
+    containers:
+      - name: main
+        # Red Hat supported CPU vLLM image.
+        image: registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:0ec0f5ff9a5ff263f58db0cfb19e3d7eef24b94c2d8629fe5145f5a8747e28c9
+        # Bound vLLM CPU memory footprint so 0.5B fits the limit (Qwen2.5-0.5B otherwise
+        # profiles against the full 32K context and gets OOMKilled on CPU).
+        args:
+          - "--dtype=bfloat16"
+          - "--max-model-len=8192"
+          - "--max-num-seqs=8"
+          - "--enable-force-include-usage"  # always emit token-usage in responses (MaaS telemetry)
+          - "--enforce-eager"
+        env:
+          - name: VLLM_LOGGING_LEVEL
+            value: INFO
+          - name: VLLM_CPU_KVCACHE_SPACE
+            value: "2"               # GiB reserved for the CPU KV cache
+          # Pin the thread pool to a small, single-NUMA-node core set: an explicit bind
+          # co-locates compute and memory on one NUMA node (fast decode). Without it,
+          # vLLM/OpenMP spawns one thread per host core and gets CPU-throttled.
+          # Keep OMP_NUM_THREADS == limits.cpu.
+          - name: OMP_NUM_THREADS
+            value: "4"
+          - name: VLLM_CPU_OMP_THREADS_BIND
+            value: "0-3"
+        resources:
+          requests:
+            cpu: "1"
+            memory: 2Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTPS
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 30
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTPS
+          initialDelaySeconds: 90
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 30

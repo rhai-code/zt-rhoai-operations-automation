@@ -1,0 +1,33 @@
+{{ if .Values.maasModel.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: maas-model
+  namespace: openshift-gitops
+spec:
+  project: infra
+  source:
+    repoURL: {{ .Values.maasModel.git.repoURL }}
+    targetRevision: {{ .Values.maasModel.git.targetRevision }}
+    path: {{ .Values.maasModel.git.path }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rhoai-lending
+  syncPolicy:
+    automated:
+      enabled: true
+      # selfHeal re-syncs on every reconciliation cycle: rhoai-lending is created
+      # by hand in Module 2 Exercise 3 (oc new-project), and there is deliberately
+      # NO CreateNamespace here — the Application retries (degraded) until Ex 3
+      # creates the project, then converges.
+      selfHeal: true
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}

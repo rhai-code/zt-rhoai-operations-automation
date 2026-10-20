@@ -64,3 +64,18 @@ opsLdap:
   domain: fedoracapital.io
   hostname: freeipa.freeipa.svc.cluster.local
   password: REPLACE_AT_APPLY # set at the one-time apply — never committed
+
+# ---------------------------------------------------------------------------
+# maas-model — the Lending model published through MaaS (LLMInferenceService +
+# MaaSModelRef in rhoai-lending). Pre-setup for Module 2 Exercise 6: the MaaS
+# platform stack (gateway, maas-api, authorino) is deployed by the platform
+# (DSC modelsAsAService: Managed); this app only seeds the LOB model.
+# Deliberately NO CreateNamespace: rhoai-lending is created by hand in Module 2
+# Exercise 3 (oc new-project), so the Application retries (degraded) until Ex 3
+# creates the project, then converges via selfHeal.
+# ---------------------------------------------------------------------------
+maasModel:
+  enabled: true
+  git:
+    path: cluster/maas-model
+    <<: *git_defaults

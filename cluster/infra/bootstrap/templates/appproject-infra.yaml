@@ -6,7 +6,7 @@ metadata:
   name: infra
   namespace: openshift-gitops
 spec:
-  description: Infra layer of the RHOAI Operations workshop (LDAP directory + identity federation)
+  description: Infra layer of the RHOAI Operations workshop (LDAP directory + identity setup + MaaS model)
   sourceRepos:
     - https://github.com/rhai-code/zt-rhoai-operations-automation
   destinations:
