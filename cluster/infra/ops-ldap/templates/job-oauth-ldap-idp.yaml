@@ -44,7 +44,7 @@ spec:
               oc create secret generic freeipa-ldap-bind-password \
                 --from-literal=bindPassword="$FREEIPA_PASSWORD" \
                 -n openshift-config --dry-run=client -o yaml | oc apply -f -
-              LDAP_IDP='{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["displayName"],"preferredUsername":["uid"]},"bindDN":"uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io","bindPassword":{"name":"freeipa-ldap-bind-password"},"ca":{"name":"freeipa-ca"},"insecure":false,"url":"ldaps://freeipa.freeipa.svc.cluster.local:636/dc=fedoracapital,dc=io?uid?sub"},"mappingMethod":"claim","name":"freeipa-ldap","type":"LDAP"}'
+              LDAP_IDP='{"ldap":{"attributes":{"email":["mail"],"id":["dn"],"name":["displayName"],"preferredUsername":["uid"]},"bindDN":"uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io","bindPassword":{"name":"freeipa-ldap-bind-password"},"ca":{"name":"freeipa-ca"},"insecure":false,"url":"ldaps://freeipa.freeipa.svc.cluster.local:636/cn=users,cn=accounts,dc=fedoracapital,dc=io?uid?sub"},"mappingMethod":"claim","name":"freeipa-ldap","type":"LDAP"}'
               IDX=""
               i=0
               NAMES=$(oc get oauth cluster -o jsonpath='{.spec.identityProviders[*].name}')
