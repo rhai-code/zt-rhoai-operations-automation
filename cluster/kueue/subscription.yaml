@@ -1,0 +1,21 @@
+---
+# The Red Hat build of Kueue, installed via OLM (OperatorHub). The RHOAI
+# operator does NOT manage the Kueue lifecycle in RHOAI 3.5 — both the DSC
+# `kueue` component key and the Kueue component CR reject managementState:
+# Managed ("present for backwards compatibility with OLM upgrades, but not
+# supported at runtime"), so the operator install is the supported path.
+#
+# The Subscription lands in openshift-operators (AllNamespaces OperatorGroup).
+# The operator installs the kueue.x-k8s.io CRDs (~1-2 min); demo-queues.yaml
+# rides the Application's SkipDryRunOnMissingResource + retry until they exist.
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: kueue-operator
+  namespace: openshift-operators
+spec:
+  channel: stable-v1.4
+  installPlanApproval: Automatic
+  name: kueue-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace

@@ -16,18 +16,15 @@ spec:
   syncPolicy:
     automated:
       enabled: true
-      # selfHeal keeps the DSC component Managed even if something re-applies
-      # the DataScienceCluster without it (lab clusters ship it Removed).
       selfHeal: true
     syncOptions:
-      # ServerSideApply (kubectl apply --server-side --force-conflicts) makes
-      # the DSC patch own ONLY its kueue component key — the rest of the
-      # DataScienceCluster stays owned by the cluster provisioning.
+      # ServerSideApply keeps Git the source of truth for the Subscription and
+      # the demo queues.
       - ServerSideApply=true
-      # The kueue.x-k8s.io CRDs are NOT part of the sync: the RHOAI operator
-      # installs them in response to the DSC patch (~15s).
-      # SkipDryRunOnMissingResource + retry bridge the gap; the demo queues
-      # apply once the CRDs exist.
+      # The kueue.x-k8s.io CRDs are NOT part of the sync: the Red Hat build of
+      # Kueue operator installs them in response to the Subscription (~1-2
+      # min). SkipDryRunOnMissingResource + retry bridge the gap; the demo
+      # queues apply once the CRDs exist.
       - SkipDryRunOnMissingResource=true
       - RespectIgnoreDifferences=true
     retry:

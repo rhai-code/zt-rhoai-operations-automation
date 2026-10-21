@@ -146,7 +146,7 @@ cluster/
 │   └── mlflow.yaml                         # cluster-scoped MLflow instance CR
 └── kueue/                                  # Red Hat build of Kueue (Module 3 GPU scheduling)
     ├── kustomization.yaml
-    ├── dsc-patch.yaml                      # enables the kueue DSC component
+    ├── subscription.yaml                   # OLM Subscription (kueue-operator, stable-v1.4)
     └── demo-queues.yaml                    # demo ResourceFlavor + Cohort + ClusterQueue
 ```
 
@@ -164,7 +164,7 @@ Plus `cluster/model-registry/` — the namespaced ModelRegistry instance CR
 | `maasModel` | `maasModel` | Lending model via MaaS (LLMInferenceService + MaaSModelRef in rhoai-lending), Module 2 Ex 6 |
 | `mlflow` | `mlflow` | MLflow instance (sqlite + 20Gi PVC) + mlflowoperator DSC component, Module 3 tracking |
 | `modelRegistry` | `modelRegistry` | ModelRegistry instance (REST + generated Postgres) in rhoai-model-registries, Module 3 Ex 3 |
-| `kueue` | `kueue` | Red Hat build of Kueue via the DSC component + demo Cohort/ClusterQueue, Module 3 (conceptual GPU scheduling) |
+| `kueue` | `kueue` | Red Hat build of Kueue (OLM subscription) + demo Cohort/ClusterQueue, Module 3 (conceptual GPU scheduling) |
 
 ---
 
@@ -187,9 +187,9 @@ oc get oauth cluster -o jsonpath='{range .spec.identityProviders[*]}{.name}{"\t"
                                                     # freeipa-ldap first (LDAP), rhbk second
 oc get groups                                       # persona groups (via ldap-group-sync)
 oc -n freeipa get cronjob ldap-group-sync           # group sync schedule
-oc get dsc default-dsc -o jsonpath='{.spec.components.kueue.managementState}'
-                                                    # Managed (kueue component)
-oc get crd | grep kueue.x-k8s.io                    # Kueue CRDs (installed by the RHOAI operator)
+oc -n openshift-gitops get app kueue                # OLM subscription synced
+oc get csv -A | grep kueue                          # Red Hat build of Kueue (openshift-operators)
+oc get crd | grep kueue.x-k8s.io                    # Kueue CRDs (installed by the operator)
 oc get clusterqueue research-team                   # demo ClusterQueue Active
 ```
 
