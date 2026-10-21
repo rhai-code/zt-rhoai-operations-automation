@@ -6,7 +6,7 @@ metadata:
   name: infra
   namespace: openshift-gitops
 spec:
-  description: Infra layer of the RHOAI Operations workshop (LDAP directory + identity setup + MaaS model + MLflow)
+  description: Infra layer of the RHOAI Operations workshop (LDAP directory + identity setup + MaaS model + MLflow + Kueue)
   sourceRepos:
     - https://github.com/rhai-code/zt-rhoai-operations-automation
   destinations:
@@ -27,13 +27,17 @@ spec:
     # Group needs it whitelisted (the namespace '*' whitelist doesn't apply)
     - group: user.openshift.io
       kind: Group
-    # MLflow: the cluster-scoped MLflow instance CR and the DataScienceCluster
-    # patch that enables the mlflowoperator component (both cluster-scoped —
+    # MLflow: the cluster-scoped MLflow instance CR (both cluster-scoped —
     # the namespace '*' whitelist doesn't apply)
     - group: mlflow.opendatahub.io
       kind: MLflow
-    - group: datasciencecluster.opendatahub.io
-      kind: DataScienceCluster
+    # Kueue: the cluster-scoped Kueue operator configuration CR — the RHBoK
+    # operator waits for it before installing the kueue.x-k8s.io CRDs. The
+    # DSC itself is NOT in this list: the mlflow hook Job enables the
+    # mlflowoperator component via a merge patch through RBAC, not via an
+    # ArgoCD-managed DataScienceCluster resource.
+    - group: kueue.openshift.io
+      kind: Kueue
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"
