@@ -3,10 +3,14 @@
 # `mlflow`, lands in redhat-ods-applications. sqlite backend + 20Gi PVC; the
 # tracking URI is https://mlflow.redhat-ods-applications.svc:8443/mlflow.
 # Verbatim from gitops-clusters applications/rhoai/overlay/mlflow/mlflow.yaml.
+# Wave 2: after the wave-1 mlflow-dsc-patch hook Job has flipped the component
+# to Managed and the operator has installed the MLflow CRDs.
 apiVersion: mlflow.opendatahub.io/v1
 kind: MLflow
 metadata:
   name: mlflow
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   artifactsDestination: file:///mlflow/artifacts
   backendStoreUri: sqlite:////mlflow/mlflow.db

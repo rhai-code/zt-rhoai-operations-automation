@@ -16,17 +16,16 @@ spec:
   syncPolicy:
     automated:
       enabled: true
-      # selfHeal keeps the DSC component Managed even if something re-applies
-      # the DataScienceCluster without it (lab clusters ship it Removed).
+      # selfHeal re-syncs when the pool's sync resets the DSC component — the
+      # wave-1 hook Job (merge patch) then re-enables mlflowoperator and the
+      # operator reinstalls the MLflow CRDs the operator removed.
       selfHeal: true
     syncOptions:
-      # ServerSideApply (kubectl apply --server-side --force-conflicts) makes
-      # the DSC patch own ONLY its mlflowoperator component key — the rest of
-      # the DataScienceCluster stays owned by the cluster provisioning.
       - ServerSideApply=true
       # The MLflow CRD is NOT part of the sync: the mlflowoperator installs it
-      # in response to the DSC patch (~15s). SkipDryRunOnMissingResource +
-      # retry bridge the gap; the CR applies once the CRD exists.
+      # in response to the hook Job's DSC merge patch (~15s).
+      # SkipDryRunOnMissingResource + retry bridge the gap; the CR applies once
+      # the CRD exists.
       - SkipDryRunOnMissingResource=true
       - RespectIgnoreDifferences=true
     retry:

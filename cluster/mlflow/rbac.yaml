@@ -1,0 +1,36 @@
+---
+# RBAC for the DSC patch hook Job. The mlflow-setup ServiceAccount gets ONLY:
+#   - get/patch on the cluster-scoped DataScienceCluster (the merge patch that
+#     flips the mlflowoperator component to Managed)
+#   - get/list/watch on CRDs (the Job gates on the MLflow CRD being
+#     established before the wave-2 MLflow instance CR applies)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlflow-setup
+  namespace: redhat-ods-applications
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mlflow-setup-dsc
+rules:
+  - apiGroups: ["datasciencecluster.opendatahub.io"]
+    resources: ["datascienceclusters"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mlflow-setup-dsc
+subjects:
+  - kind: ServiceAccount
+    name: mlflow-setup
+    namespace: redhat-ods-applications
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mlflow-setup-dsc

@@ -1,0 +1,30 @@
+---
+# The Kueue operator's configuration CR. The Red Hat build of Kueue operator
+# waits for this object before installing the kueue.x-k8s.io CRDs and the
+# kueue-controller-manager — without it it logs
+#   "operator configuration not found: kueues.kueue.openshift.io \"cluster\" not found"
+# and stays unconfigured.
+#
+# Cluster-scoped, standard operator managementState semantics — Managed is
+# accepted on THIS API (unlike the deprecated RHOAI DSC kueue component key
+# and the components.platform.opendatahub.io Kueue CR, which both reject it).
+apiVersion: kueue.openshift.io/v1
+kind: Kueue
+metadata:
+  name: cluster
+spec:
+  managementState: Managed
+  config:
+    integrations:
+      # Workload frameworks Kueue manages. Covers RHOAI's distributed
+      # workloads (trainer v1 PyTorch/TF, trainer v2 TrainJob/JobSet) and
+      # Ray. Pod integration deliberately OFF — it adds a webhook on every
+      # pod create cluster-wide.
+      frameworks:
+        - BatchJob
+        - JobSet
+        - PyTorchJob
+        - TFJob
+        - TrainJob
+        - RayJob
+        - RayCluster

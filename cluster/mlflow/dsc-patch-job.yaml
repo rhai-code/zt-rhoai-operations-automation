@@ -1,0 +1,45 @@
+---
+# Enables the mlflowoperator DSC component via a MERGE PATCH (sync hook, wave 1).
+#
+# WHY A JOB AND NOT A MANIFEST: the DSC's spec.components tree is solely owned
+# by the argocd-controller SSA field manager (a full-DSC apply claimed it). An
+# ArgoCD SSA apply of a partial DSC patch PRUNES every sibling component field
+# that manager owns (kserve, kueue, dashboard, ...), and the one-directional
+# CEL rule on kserve.modelsAsService now blocks that atomically
+# ("cannot re-enable once Removed"). A merge patch touches ONLY its keys —
+# no prune, no field-manager conflict.
+#
+# Lab clusters ship the component Removed — without it the operator never
+# installs the MLflow CRDs and the wave-2 instance CR cannot apply.
+# Idempotent (merge patch). BeforeHookCreation: re-runs on every sync.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mlflow-dsc-patch
+  namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: mlflow-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: dsc-patch
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              # Merge patch — touches ONLY the mlflowoperator component key.
+              oc patch dsc default-dsc --type=merge \
+                -p '{"spec":{"components":{"mlflowoperator":{"managementState":"Managed"}}}}'
+              # Gate: the operator installs the MLflow CRDs in response (~15s);
+              # the wave-2 instance CR applies once they are established.
+              oc wait --for=condition=Established \
+                crd/mlflows.mlflow.opendatahub.io --timeout=300s
+              echo "mlflowoperator: Managed; MLflow CRDs established"

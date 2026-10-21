@@ -141,12 +141,14 @@ cluster/
 │   └── maasmodelref.yaml
 ├── mlflow/                                 # MLflow instance (Module 3 tracking)
 │   ├── kustomization.yaml
-│   ├── dsc-patch.yaml                      # enables the mlflowoperator DSC component
+│   ├── rbac.yaml                           # mlflow-setup SA (DSC patch + CRD wait)
+│   ├── dsc-patch-job.yaml                  # sync hook: MERGE patch flips mlflowoperator to Managed
 │   ├── mlflow-sa.yaml                      # the CR's serviceAccountName (operator doesn't create it)
-│   └── mlflow.yaml                         # cluster-scoped MLflow instance CR
+│   └── mlflow.yaml                         # cluster-scoped MLflow instance CR (wave 2)
 └── kueue/                                  # Red Hat build of Kueue (Module 3 GPU scheduling)
     ├── kustomization.yaml
     ├── subscription.yaml                   # OLM Subscription (kueue-operator, stable-v1.4)
+    ├── kueue-cr.yaml                       # the operator's Kueue CR ("cluster") — gates the CRD install
     └── demo-queues.yaml                    # demo ResourceFlavor + Cohort + ClusterQueue
 ```
 
@@ -191,6 +193,10 @@ oc -n openshift-gitops get app kueue                # OLM subscription synced
 oc get csv -A | grep kueue                          # Red Hat build of Kueue (openshift-operators)
 oc get crd | grep kueue.x-k8s.io                    # Kueue CRDs (installed by the operator)
 oc get clusterqueue research-team                   # demo ClusterQueue Active
+oc get dsc default-dsc -o jsonpath='{.spec.components.mlflowoperator.managementState}{"\n"}'
+                                                    # Managed (via the mlflow-dsc-patch hook Job)
+oc -n redhat-ods-applications get pods -l app.kubernetes.io/name=mlflow
+                                                    # MLflow server up (2/2)
 ```
 
 Persona login (own-alice, ste-carol, …) via the console lands through

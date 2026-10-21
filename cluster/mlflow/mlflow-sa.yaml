@@ -1,8 +1,11 @@
 ---
 # The MLflow instance CR references serviceAccountName: mlflow-sa — the
 # operator does NOT create it, so it must exist before the instance deploys.
+# Wave 2: alongside the MLflow instance CR.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: mlflow-sa
   namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"

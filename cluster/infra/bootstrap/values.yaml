@@ -84,11 +84,14 @@ maasModel:
 # mlflow — the cluster-scoped MLflow instance (experiment tracking server) in
 # redhat-ods-applications. Pre-setup for Module 3: the custom workbench image
 # ships mlflow-skinny and the labs track experiments against this server
-# (https://mlflow.redhat-ods-applications.svc:8443/mlflow). The app also
-# enables the mlflowoperator DSC component (lab clusters ship it Removed) —
-# the operator then installs the MLflow CRDs, and the instance CR deploys the
-# server (sqlite backend + 20Gi PVC). The app creates the mlflow-sa service
-# account the instance references — the operator does NOT create it.
+# (https://mlflow.redhat-ods-applications.svc:8443/mlflow). The app enables the
+# mlflowoperator DSC component via a merge-patch sync-hook Job (an ArgoCD SSA
+# apply of a partial DSC patch would prune every component field the shared
+# argocd-controller field manager owns — the one-directional CEL rule on
+# kserve.modelsAsService blocks that) — the operator then installs the MLflow
+# CRDs, and the instance CR deploys the server (sqlite backend + 20Gi PVC).
+# The app creates the mlflow-sa service account the instance references — the
+# operator does NOT create it.
 # ---------------------------------------------------------------------------
 mlflow:
   enabled: true
