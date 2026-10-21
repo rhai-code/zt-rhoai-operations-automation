@@ -116,7 +116,8 @@ cluster/
 │   │       ├── application-freeipa.yaml
 │   │       ├── application-ops-ldap.yaml
 │   │       ├── application-maas-model.yaml
-│   │       └── application-mlflow.yaml
+│   │       ├── application-mlflow.yaml
+│   │       └── application-model-registry.yaml
 │   ├── freeipa/                            # FreeIPA server (plain manifests)
 │   │   ├── values.yaml
 │   │   └── templates/
@@ -145,6 +146,9 @@ cluster/
     └── mlflow.yaml                         # cluster-scoped MLflow instance CR
 ```
 
+Plus `cluster/model-registry/` — the namespaced ModelRegistry instance CR
+(Module 3 Exercise 3; the DSC component only installs the operator).
+
 ---
 
 ## Workloads
@@ -155,6 +159,7 @@ cluster/
 | `opsLdap` | `opsLdap` | Identity setup: persona population, CA, OCP LDAP IdP, groups claim, group sync |
 | `maasModel` | `maasModel` | Lending model via MaaS (LLMInferenceService + MaaSModelRef in rhoai-lending), Module 2 Ex 6 |
 | `mlflow` | `mlflow` | MLflow instance (sqlite + 20Gi PVC) + mlflowoperator DSC component, Module 3 tracking |
+| `modelRegistry` | `modelRegistry` | ModelRegistry instance (REST + generated Postgres) in rhoai-model-registries, Module 3 Ex 3 |
 
 ---
 

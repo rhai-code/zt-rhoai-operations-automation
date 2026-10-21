@@ -1,0 +1,33 @@
+{{ if .Values.modelRegistry.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: model-registry
+  namespace: openshift-gitops
+spec:
+  project: infra
+  source:
+    repoURL: {{ .Values.modelRegistry.git.repoURL }}
+    targetRevision: {{ .Values.modelRegistry.git.targetRevision }}
+    path: {{ .Values.modelRegistry.git.path }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.modelRegistry.namespace }}
+  syncPolicy:
+    automated:
+      enabled: true
+      # selfHeal keeps the instance converged; the namespace is created by the
+      # DSC modelregistry component (registriesNamespace), which exists after
+      # the RHOAI install — the Application retries until then.
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}

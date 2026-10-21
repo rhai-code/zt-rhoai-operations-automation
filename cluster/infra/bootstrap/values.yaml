@@ -96,3 +96,19 @@ mlflow:
     path: cluster/mlflow
     <<: *git_defaults
   namespace: redhat-ods-applications
+
+# ---------------------------------------------------------------------------
+# model-registry — the namespaced ModelRegistry instance in
+# rhoai-model-registries (the DSC registriesNamespace). Pre-setup for Module 3
+# Exercise 3: the DSC modelregistry component only installs the operator and
+# the UI; the instance CR is what deploys the registry REST service + its
+# Postgres database (routes modelregistry-https/-http). v1beta1 CR — the
+# v1alpha1 API is deprecated, and rest.serviceRoute values are
+# "enabled"/"disabled".
+# ---------------------------------------------------------------------------
+modelRegistry:
+  enabled: true
+  git:
+    path: cluster/model-registry
+    <<: *git_defaults
+  namespace: rhoai-model-registries

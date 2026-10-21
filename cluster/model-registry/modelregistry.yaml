@@ -1,0 +1,16 @@
+---
+# The namespaced ModelRegistry instance. The DSC modelregistry component only
+# installs the operator (pods in redhat-ods-applications) — the instance CR
+# must be created for the registry REST service + its Postgres database to
+# deploy (into the registriesNamespace, rhoai-model-registries). v1beta1 (the
+# v1alpha1 API is deprecated); serviceRoute values are "enabled"/"disabled".
+apiVersion: modelregistry.opendatahub.io/v1beta1
+kind: ModelRegistry
+metadata:
+  name: modelregistry
+  namespace: rhoai-model-registries
+spec:
+  postgres:
+    generateDeployment: true
+  rest:
+    serviceRoute: "enabled"
