@@ -1,0 +1,18 @@
+---
+# Strategic-merge (server-side) patch enabling the Red Hat build of Kueue.
+# Lab clusters ship the DSC component Removed — without it the RHOAI operator
+# never installs the kueue.x-k8s.io CRDs and the demo queues below cannot be
+# applied.
+#
+# Applied with the Application's ServerSideApply=true syncOption (kubectl
+# apply --server-side --force-conflicts), so this partial manifest owns ONLY
+# the kueue component key — the rest of the DataScienceCluster stays owned by
+# whoever set it (the cluster provisioning).
+apiVersion: datasciencecluster.opendatahub.io/v2
+kind: DataScienceCluster
+metadata:
+  name: default-dsc
+spec:
+  components:
+    kueue:
+      managementState: Managed

@@ -1,0 +1,63 @@
+---
+# Demo Kueue quota tree for the Module 3 conceptual GPU scheduling section —
+# CPU-only (the lab cluster has no GPUs; quota bookkeeping works regardless).
+#
+# A department Cohort owns the shared pool; the research-team ClusterQueue has
+# its own protected nominal quota plus a borrowingLimit against the Cohort.
+# LocalQueues are NOT seeded here — the exercise has each user create one in
+# their own project.
+#
+# The kueue.x-k8s.io CRDs exist only after the kueue DSC component
+# (dsc-patch.yaml) is Managed and the RHOAI operator installs them (~15s) —
+# the Application's SkipDryRunOnMissingResource + retry bridge the gap.
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: cpu-flavor
+spec: {} # no nodeLabels/tolerations — matches any node
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: Cohort
+metadata:
+  name: research-department
+spec:
+  # The Cohort owns the department pool. Cohort resources are ADDITIVE to the
+  # member CQ quotas (total = Σ CQ nominalQuota + Cohort nominalQuota) — keep
+  # member unreserved-style CQs at zero nominal if you extend this tree.
+  resourceGroups:
+    - coveredResources:
+        - cpu
+        - memory
+      flavors:
+        - name: cpu-flavor
+          resources:
+            - name: cpu
+              nominalQuota: 24
+            - name: memory
+              nominalQuota: 96Gi
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: research-team
+spec:
+  cohortName: research-department
+  namespaceSelector: {} # any namespace may point a LocalQueue at this queue
+  resourceGroups:
+    - coveredResources:
+        - cpu
+        - memory
+      flavors:
+        - name: cpu-flavor
+          resources:
+            - name: cpu
+              nominalQuota: 12 # protected: always available to this team
+              borrowingLimit: 8 # + up to 8 more borrowed from the Cohort when idle
+            - name: memory
+              nominalQuota: 48Gi
+              borrowingLimit: 32Gi
+  preemption:
+    withinClusterQueue: LowerPriority
+    reclaimWithinCohort: Any # take borrowed quota back when this team needs it
+    borrowWithinCohort:
+      policy: Never # never evict others to borrow beyond the limit

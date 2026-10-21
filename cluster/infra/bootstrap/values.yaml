@@ -98,6 +98,22 @@ mlflow:
   namespace: redhat-ods-applications
 
 # ---------------------------------------------------------------------------
+# kueue — the Red Hat build of Kueue, managed by the RHOAI operator as a DSC
+# component (lab clusters ship the component Removed). Pre-setup for Module 3:
+# the conceptual GPU scheduling section inspects real Kueue CRDs and queues.
+# The app enables the component and seeds a CPU-only demo quota tree
+# (research-department Cohort + research-team ClusterQueue); LocalQueues are
+# created per-user in the exercise. No workloads — the lab cluster has no
+# GPUs (the full hands-on is the GPU Resource Management workshop).
+# ---------------------------------------------------------------------------
+kueue:
+  enabled: true
+  git:
+    path: cluster/kueue
+    <<: *git_defaults
+  namespace: redhat-ods-applications
+
+# ---------------------------------------------------------------------------
 # model-registry — the namespaced ModelRegistry instance in
 # rhoai-model-registries (the DSC registriesNamespace). Pre-setup for Module 3
 # Exercise 3: the DSC modelregistry component only installs the operator and

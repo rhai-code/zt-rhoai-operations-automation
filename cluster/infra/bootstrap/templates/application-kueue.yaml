@@ -1,0 +1,39 @@
+{{ if .Values.kueue.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kueue
+  namespace: openshift-gitops
+spec:
+  project: infra
+  source:
+    repoURL: {{ .Values.kueue.git.repoURL }}
+    targetRevision: {{ .Values.kueue.git.targetRevision }}
+    path: {{ .Values.kueue.git.path }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.kueue.namespace }}
+  syncPolicy:
+    automated:
+      enabled: true
+      # selfHeal keeps the DSC component Managed even if something re-applies
+      # the DataScienceCluster without it (lab clusters ship it Removed).
+      selfHeal: true
+    syncOptions:
+      # ServerSideApply (kubectl apply --server-side --force-conflicts) makes
+      # the DSC patch own ONLY its kueue component key — the rest of the
+      # DataScienceCluster stays owned by the cluster provisioning.
+      - ServerSideApply=true
+      # The kueue.x-k8s.io CRDs are NOT part of the sync: the RHOAI operator
+      # installs them in response to the DSC patch (~15s).
+      # SkipDryRunOnMissingResource + retry bridge the gap; the demo queues
+      # apply once the CRDs exist.
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}
