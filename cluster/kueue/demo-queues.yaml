@@ -10,13 +10,13 @@
 # The kueue.x-k8s.io CRDs exist only after the kueue DSC component
 # (dsc-patch.yaml) is Managed and the RHOAI operator installs them (~15s) —
 # the Application's SkipDryRunOnMissingResource + retry bridge the gap.
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ResourceFlavor
 metadata:
   name: cpu-flavor
 spec: {} # no nodeLabels/tolerations — matches any node
 ---
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: Cohort
 metadata:
   name: research-department
@@ -36,7 +36,7 @@ spec:
             - name: memory
               nominalQuota: 96Gi
 ---
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
 metadata:
   name: research-team

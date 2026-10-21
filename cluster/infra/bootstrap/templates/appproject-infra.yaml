@@ -32,12 +32,19 @@ spec:
     - group: mlflow.opendatahub.io
       kind: MLflow
     # Kueue: the cluster-scoped Kueue operator configuration CR — the RHBoK
-    # operator waits for it before installing the kueue.x-k8s.io CRDs. The
-    # DSC itself is NOT in this list: the mlflow hook Job enables the
-    # mlflowoperator component via a merge patch through RBAC, not via an
-    # ArgoCD-managed DataScienceCluster resource.
+    # operator waits for it before installing the kueue.x-k8s.io CRDs — and the
+    # cluster-scoped demo queues (ClusterQueue/Cohort/ResourceFlavor; LocalQueue
+    # is namespaced). The DSC itself is NOT in this list: the mlflow hook Job
+    # enables the mlflowoperator component via a merge patch through RBAC, not
+    # via an ArgoCD-managed DataScienceCluster resource.
     - group: kueue.openshift.io
       kind: Kueue
+    - group: kueue.x-k8s.io
+      kind: ClusterQueue
+    - group: kueue.x-k8s.io
+      kind: Cohort
+    - group: kueue.x-k8s.io
+      kind: ResourceFlavor
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"
