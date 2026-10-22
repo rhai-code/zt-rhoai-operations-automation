@@ -145,11 +145,14 @@ cluster/
 │   ├── dsc-patch-job.yaml                  # sync hook: MERGE patch flips mlflowoperator to Managed
 │   ├── mlflow-sa.yaml                      # the CR's serviceAccountName (operator doesn't create it)
 │   └── mlflow.yaml                         # cluster-scoped MLflow instance CR (wave 2)
-└── kueue/                                  # Red Hat build of Kueue (Module 3 GPU scheduling)
+├── kueue/                                    # Red Hat build of Kueue (Module 3 GPU scheduling)
+│   ├── kustomization.yaml
+│   ├── subscription.yaml                     # OLM Subscription (kueue-operator, stable-v1.4)
+│   ├── kueue-cr.yaml                         # the operator's Kueue CR ("cluster") — gates the CRD install
+│   └── demo-queues.yaml                      # demo ResourceFlavor + Cohort + ClusterQueue
+└── oadp/                                     # OADP operator via OLM (Module 6 prerequisite)
     ├── kustomization.yaml
-    ├── subscription.yaml                   # OLM Subscription (kueue-operator, stable-v1.4)
-    ├── kueue-cr.yaml                       # the operator's Kueue CR ("cluster") — gates the CRD install
-    └── demo-queues.yaml                    # demo ResourceFlavor + Cohort + ClusterQueue
+    └── subscription.yaml                     # OperatorGroup + Subscription (openshift-adp, channel stable)
 ```
 
 Plus `cluster/model-registry/` — the namespaced ModelRegistry instance CR
@@ -167,6 +170,7 @@ Plus `cluster/model-registry/` — the namespaced ModelRegistry instance CR
 | `mlflow` | `mlflow` | MLflow instance (sqlite + 20Gi PVC) + mlflowoperator DSC component, Module 3 tracking |
 | `modelRegistry` | `modelRegistry` | ModelRegistry instance (REST + generated Postgres) in rhoai-model-registries, Module 3 Ex 3 |
 | `kueue` | `kueue` | Red Hat build of Kueue (OLM subscription) + demo Cohort/ClusterQueue, Module 3 (conceptual GPU scheduling) |
+| `oadp` | `oadp` | OADP operator (OLM subscription, openshift-adp) — prerequisite for Module 6 Backups & DR |
 
 ---
 
@@ -193,6 +197,9 @@ oc -n openshift-gitops get app kueue                # OLM subscription synced
 oc get csv -A | grep kueue                          # Red Hat build of Kueue (openshift-operators)
 oc get crd | grep kueue.x-k8s.io                    # Kueue CRDs (installed by the operator)
 oc get clusterqueue research-team                   # demo ClusterQueue Active
+oc -n openshift-gitops get app oadp                 # OADP subscription synced
+oc get csv -n openshift-adp | grep oadp             # OADP operator (channel stable)
+oc -n openshift-adp get pods                        # controller-manager 1/1
 oc get dsc default-dsc -o jsonpath='{.spec.components.mlflowoperator.managementState}{"\n"}'
                                                     # Managed (via the mlflow-dsc-patch hook Job)
 oc -n redhat-ods-applications get pods -l app.kubernetes.io/name=mlflow

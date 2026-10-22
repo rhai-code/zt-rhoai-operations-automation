@@ -1,0 +1,38 @@
+{{ if .Values.oadp.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: oadp
+  namespace: openshift-gitops
+spec:
+  project: infra
+  source:
+    repoURL: {{ .Values.oadp.git.repoURL }}
+    targetRevision: {{ .Values.oadp.git.targetRevision }}
+    path: {{ .Values.oadp.git.path }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.oadp.namespace }}
+  syncPolicy:
+    automated:
+      enabled: true
+      selfHeal: true
+    syncOptions:
+      # openshift-adp does not exist on a fresh cluster — create it on the
+      # first sync.
+      - CreateNamespace=true
+      # ServerSideApply keeps Git the source of truth for the OperatorGroup and
+      # the Subscription.
+      - ServerSideApply=true
+      # The velero.io CRDs are NOT part of the sync: the OADP operator installs
+      # them with the CSV (~1-2 min). SkipDryRunOnMissingResource + retry bridge
+      # the gap.
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}

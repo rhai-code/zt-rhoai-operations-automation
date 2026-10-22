@@ -1,0 +1,32 @@
+---
+# The OADP (OpenShift API for Data Protection) operator, installed via OLM
+# (OperatorHub). Built on Velero — the Red Hat-supported backup solution for
+# OpenShift application workloads. Prerequisite for Module 6 (Backups & DR):
+# the docs configure the backup location (a real NooBaa bucket claimed from
+# ODF via an OBC) and run the backup/restore exercises against this operator.
+#
+# The Subscription lands in openshift-adp — a dedicated namespace + OperatorGroup
+# (the Application uses CreateNamespace=true; the namespace does not exist on a
+# fresh cluster). The operator installs the velero.io CRDs and deploys the
+# velero + node-agent pods in response to the DataProtectionApplication CR,
+# which is created by hand in Module 6.
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: oadp-operator-group
+  namespace: openshift-adp
+spec:
+  targetNamespaces:
+    - openshift-adp
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: redhat-oadp-operator
+  namespace: openshift-adp
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: redhat-oadp-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace

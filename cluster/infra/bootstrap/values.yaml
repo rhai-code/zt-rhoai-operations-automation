@@ -134,3 +134,19 @@ modelRegistry:
     path: cluster/model-registry
     <<: *git_defaults
   namespace: rhoai-model-registries
+
+# ---------------------------------------------------------------------------
+# oadp — the OADP (OpenShift API for Data Protection) operator, installed via
+# OLM (redhat-oadp-operator in openshift-adp, dedicated OperatorGroup).
+# Prerequisite for Module 6 (Backups & DR): the docs configure the backup
+# location (a real NooBaa bucket claimed from ODF via an OBC) and run the
+# backup/restore exercises against this operator. The velero.io CRDs and the
+# velero + node-agent pods are installed by the operator in response to the
+# DataProtectionApplication CR; the CR itself is created by hand in Module 6.
+# ---------------------------------------------------------------------------
+oadp:
+  enabled: true
+  git:
+    path: cluster/oadp
+    <<: *git_defaults
+  namespace: openshift-adp
