@@ -35,11 +35,10 @@ via token-in-URL, see the values file header):
 
 ```bash
 export KUBECONFIG=~/.kube/config.fde2
-export GH_TOKEN=<github token>
 helm upgrade --install showroom ~/git/zt-showroom-deployer \
   -n showroom-rhoai-operations --create-namespace \
   -f values-rhoai-operations-fde2.yaml \
-  --set showroom.gitRepoUrl="https://x-access-token:${GH_TOKEN}@github.com/rhai-code/zt-rhoai-operations-showroom.git"
+  --set showroom.gitRepoUrl="https://github.com/rhai-code/zt-rhoai-operations-showroom.git"
 ```
 
 ## Cluster layer bootstrap (one-time)
@@ -84,20 +83,6 @@ spec:
         factor: 2
         maxDuration: 3m
 EOF
-```
-
-ArgoCD also needs a repo credential for this private repo (one-time, uses the
-GH token — never in git):
-
-```bash
-KUBECONFIG=~/.kube/config.fde2 oc create secret generic ops-automation-repo \
-  -n openshift-gitops \
-  --from-literal=type=git \
-  --from-literal=url=https://github.com/rhai-code/zt-rhoai-operations-automation \
-  --from-literal=username=x-access-token \
-  --from-literal=password=$GH_TOKEN
-KUBECONFIG=~/.kube/config.fde2 oc label secret ops-automation-repo \
-  -n openshift-gitops argocd.argoproj.io/secret-type=repository
 ```
 
 See [`cluster/START_HERE.md`](cluster/START_HERE.md) for the full flow.
