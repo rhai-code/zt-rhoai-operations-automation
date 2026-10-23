@@ -3,12 +3,12 @@
 # merge-patching the Kuadrant operator's Authorino CR.
 #
 # WHY A JOB AND NOT A MANIFEST: the Authorino CR is created by the Kuadrant
-# operator after the Kuadrant CR (wave 2) reconciles — it does not exist until
-# then, and its spec.volumes field is operator-owned. A merge patch touches
-# ONLY spec.volumes — no field-manager conflict (the mlflow dsc-patch pattern).
+# operator after the Kuadrant CR reconciles — it does not exist until then, and
+# its spec.volumes field is operator-owned. A merge patch touches ONLY
+# spec.volumes — no field-manager conflict (the mlflow dsc-patch pattern).
 #
-# Wave 3, after the Kuadrant CR (wave 2). Idempotent (merge patch of the same
-# values); BeforeHookCreation re-runs on every sync.
+# Wave 1, after the Kuadrant CR. Idempotent (merge patch of the same values);
+# BeforeHookCreation re-runs on every sync.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -17,7 +17,7 @@ metadata:
   annotations:
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   backoffLimit: 20
   template:
@@ -33,7 +33,7 @@ spec:
             - |
               set -euo pipefail
               # The Authorino CR is created by the Kuadrant operator after the
-              # Kuadrant CR (wave 2) reconciles.
+              # Kuadrant CR reconciles.
               until oc -n kuadrant-system get authorino authorino >/dev/null 2>&1; do
                 echo "waiting for the Authorino CR"; sleep 10
               done

@@ -1,8 +1,10 @@
 ---
 # Red Hat Connectivity Link (Kuadrant/Authorino) + cert-manager operator
-# subscriptions ONLY. The Kuadrant CR is applied by ArgoCD AFTER the RHCL CSV
-# registers its CRDs (see operator-crs-wait + wave 2 — applying it in the same
-# pass races CRD registration and fails with "no matches for kind Kuadrant").
+# subscriptions ONLY. The Kuadrant CR is Git-managed alongside them: the
+# kuadrants CRD is registered by the RHCL operator CSV, so on a fresh cluster
+# the first sync attempts fail with "no matches for kind" until the CSV
+# installs — SkipDryRunOnMissingResource + the app's retry bridge the gap (the
+# same pattern as the kueue app's operator config CR).
 ---
 apiVersion: v1
 kind: Namespace

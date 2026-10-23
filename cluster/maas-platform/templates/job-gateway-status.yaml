@@ -9,9 +9,9 @@
 # "maas-api is not available"). ArgoCD does not own .status, so selfHeal never
 # reverts the patch.
 #
-# Wave 3, after the Gateway (wave 0) is Programmed. Idempotent (same value);
-# BeforeHookCreation re-runs on every sync. The hostname rides the
-# deployer.domain value from the one-time bootstrap apply — never in git.
+# Wave 1, after the Gateway. Idempotent (same value); BeforeHookCreation
+# re-runs on every sync. The hostname rides the deployer.domain value from the
+# one-time bootstrap apply — never in git.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -20,7 +20,7 @@ metadata:
   annotations:
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   backoffLimit: 20
   template:

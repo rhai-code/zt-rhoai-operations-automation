@@ -24,11 +24,12 @@ spec:
     syncOptions:
       # ServerSideApply keeps Git the source of truth for the plain resources.
       # The hook-Job patches (Authorino volumes, gateway Service status, DSC
-      # modelsAsAService, dashboard flags) are not in Git — never reverted.
+      # modelsAsAService) are not in Git — never reverted.
       - ServerSideApply=true
-      # Wave 2 resources (Kuadrant CR, activation CRs, telemetry CRs) are gated
-      # by the operator-crs-wait Job (wave 1), which confirms the CSVs and CRDs
-      # first; SkipDryRunOnMissingResource + retry bridge any residual gap.
+      # CRD races (Kuadrant CR, the LWS/JobSet activation CRs, the telemetry
+      # CRs) are bridged the same way as the kueue app: skip the dry-run while
+      # the CRDs do not exist and let the retry ride the operator install
+      # window.
       - SkipDryRunOnMissingResource=true
       - RespectIgnoreDifferences=true
     retry:

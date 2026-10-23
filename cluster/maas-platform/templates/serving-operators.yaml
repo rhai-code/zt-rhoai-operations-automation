@@ -2,8 +2,10 @@
 # Serving-path operators for gateway-native KServe (LLMInferenceService), used
 # by MaaS (the Lending model, Module 2 Ex 6). Subscriptions + OperatorGroups —
 # safe to apply together. The activation CRs (JobSetOperator /
-# LeaderWorkerSetOperator) are applied by ArgoCD AFTER the CSVs register their
-# CRDs (operator-crs-wait Job + wave 2).
+# LeaderWorkerSetOperator) are Git-managed in operator-config.yaml: their CRDs
+# are registered by the CSVs, so on a fresh cluster the first sync attempts
+# fail with "no matches for kind" until the CSVs install —
+# SkipDryRunOnMissingResource + the app's retry bridge the gap.
 ---
 apiVersion: v1
 kind: Namespace

@@ -78,12 +78,12 @@ bootstrap-ops Application (one-time, applied by hand)
         │     └── DataScienceCluster (wave 2; modelsAsAService NOT in Git)
         ├── maas-platform Application     (cluster/maas-platform/, Helm chart)
         │     ├── wave 0  subs (cert-manager, rhcl, LWS, JobSet) + trust CMs
-        │     │           + gateway + Route + postgres + UWM
+        │     │           + gateway + Route + postgres + UWM + Kuadrant CR
+        │     │           + activation CRs + telemetry (CRD races bridged by
+        │     │           SkipDryRunOnMissingResource + retry)
         │     │           + postgres-secrets hook Job (create-if-absent)
-        │     ├── wave 1  operator-crs-wait hook Job (CSVs Succeeded + CRDs)
-        │     ├── wave 2  Kuadrant CR + LWS/JobSet activation CRs + telemetry
-        │     ├── wave 3  authorino-trust + gateway-status hook Jobs
-        │     └── wave 4  dsc-maas-enable + dashboard-config hook Jobs
+        │     ├── wave 1  authorino-trust + gateway-status hook Jobs
+        │     └── wave 2  dsc-maas-enable hook Job (MaaS enablement)
         ├── freeipa Application           (cluster/infra/freeipa/)
         └── ops-ldap Application          (cluster/infra/ops-ldap/)
               ├── sync hooks (wave order, idempotent, re-run on every sync):
@@ -99,12 +99,13 @@ bootstrap-ops Application (one-time, applied by hand)
 
 The `rhoai-install` Application syncs as a normal workload (ns → Subscription →
 DSCI → DSC in ArgoCD sync-waves; the DSC is Git-owned). The `maas-platform`
-Application's hook Jobs each poll-wait for their dependency: RHCL/LWS/JobSet
-CSVs → Kuadrant CR + activation CRs + telemetry → Authorino trust + gateway
-status → MaaS enablement + dashboard flags. The `freeipa` Application syncs as
-a normal workload. The wave 1–4 Jobs are ArgoCD sync hooks — each poll-waits
-for its dependency (FreeIPA ready). `ldap-group-sync` is a CronJob that re-runs
-on schedule, keeping the OpenShift groups in step with FreeIPA membership.
+Application's plain resources ride the CRD races via SkipDryRunOnMissingResource
++ retry (the kueue pattern); its hook Jobs each poll-wait for their dependency:
+Authorino trust + gateway status → MaaS enablement. The `freeipa` Application
+syncs as a normal workload. The wave 1–4 Jobs are ArgoCD sync hooks — each
+poll-waits for its dependency (FreeIPA ready). `ldap-group-sync` is a CronJob
+that re-runs on schedule, keeping the OpenShift groups in step with FreeIPA
+membership.
 
 ---
 
@@ -143,21 +144,20 @@ cluster/
 │   └── templates/
 │       ├── connectivity-link.yaml            # cert-manager + RHCL subscriptions (no OG)
 │       ├── serving-operators.yaml            # LWS + JobSet subscriptions (OwnNamespace OGs)
-│       ├── kuadrant.yaml                     # kuadrant-system ns + Kuadrant CR (wave 2)
-│       ├── operator-config.yaml              # LWS/JobSet activation CRs (wave 2)
-│       ├── authorino-trust-cms.yaml          # service CA trust ConfigMaps (wave 0)
+│       ├── kuadrant.yaml                     # kuadrant-system ns + Kuadrant CR
+│       ├── operator-config.yaml              # LWS/JobSet activation CRs
+│       ├── authorino-trust-cms.yaml          # service CA trust ConfigMaps
 │       ├── gateway.yaml                      # maas-default-gateway (clusterip|loadbalancer)
 │       ├── route.yaml                        # maas.<domain> Route (clusterip mode)
-│       ├── postgres.yaml                     # PVC + Deployment + Service (wave 0)
+│       ├── postgres.yaml                     # PVC + Deployment + Service
+│       ├── dashboard-config.yaml             # OdhDashboardConfig (Git-managed directly)
 │       ├── uwm.yaml                          # cluster-monitoring-config (UWM on)
 │       ├── telemetry.yaml                    # Istio Telemetry + Kuadrant TelemetryPolicy
 │       ├── rbac.yaml                         # maas-setup SA + ClusterRoles (resourceNames)
 │       ├── job-postgres-secrets.yaml         # wave 0 — secrets create-if-absent
-│       ├── job-operator-crs-wait.yaml        # wave 1 — CSVs Succeeded + CRDs gate
-│       ├── job-authorino-trust.yaml          # wave 3 — Authorino CR volumes patch
-│       ├── job-gateway-status.yaml           # wave 3 — svc status with the Route host
-│       ├── job-dsc-maas-enable.yaml          # wave 4 — DSC modelsAsAService: Managed
-│       └── job-dashboard-config.yaml         # wave 4 — dashboard MaaS/observability flags
+│       ├── job-authorino-trust.yaml          # wave 1 — Authorino CR volumes patch
+│       ├── job-gateway-status.yaml           # wave 1 — svc status with the Route host
+│       └── job-dsc-maas-enable.yaml          # wave 2 — DSC modelsAsAService: Managed
 ├── infra/
 │   ├── bootstrap/                          # app-of-apps entry chart
 │   │   ├── values.yaml                     # workload flags + git defaults (heavily commented)
@@ -260,7 +260,7 @@ oc get subscription rhods-operator -n redhat-ods-operator -o jsonpath='{.spec.ch
 oc get csv -n redhat-ods-operator | grep rhods        # rhods-operator (Succeeded)
 oc get dsci,dsc                                       # default-dsci Ready, default-dsc True
 oc -n openshift-gitops get app maas-platform          # synced after the hook Jobs complete
-oc -n kuadrant-system get jobs                        # the 5 hook Jobs Completed
+oc -n kuadrant-system get jobs                        # the 4 hook Jobs Completed
 oc -n kuadrant-system get kuadrant                    # Kuadrant CR (observability enabled)
 oc get csv -n openshift-operators | grep -Ei 'kuadrant|authorino|limitador'
 oc -n openshift-ingress get gateway,route             # maas-default-gateway Programmed + maas-gateway-route
