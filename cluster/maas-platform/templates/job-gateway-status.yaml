@@ -1,0 +1,52 @@
+---
+# Patches the gateway Service STATUS with the Route hostname so the gateway
+# controller sets it in gateway.status.addresses.
+#
+# WHY A JOB AND NOT A MANIFEST: the Service status is an imperative patch —
+# on a cluster without a LoadBalancer provider the Service never gets an
+# external address, and the maas-api reads gateway.status.addresses to discover
+# its external URL (without it the dashboard API keys page shows
+# "maas-api is not available"). ArgoCD does not own .status, so selfHeal never
+# reverts the patch.
+#
+# Wave 3, after the Gateway (wave 0) is Programmed. Idempotent (same value);
+# BeforeHookCreation re-runs on every sync. The hostname rides the
+# deployer.domain value from the one-time bootstrap apply — never in git.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: maas-gateway-status
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: maas-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: status
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              HOST="maas.{{ .Values.deployer.domain }}"
+              # The gateway Service is created by the gateway controller from
+              # the Gateway (wave 0); its name derives from
+              # <gateway-name>-<gatewayclass-name>.
+              SVC=maas-default-gateway-data-science-gateway-class
+              until oc -n openshift-ingress get gateway maas-default-gateway >/dev/null 2>&1 \
+                  && oc -n openshift-ingress get svc "$SVC" >/dev/null 2>&1; do
+                echo "waiting for the gateway Service"; sleep 10
+              done
+              # Status-only patch — the Service gets the Route hostname as its
+              # external address; the gateway controller reflects it into
+              # gateway.status.addresses.
+              oc -n openshift-ingress patch svc "$SVC" --subresource=status --type=merge \
+                -p "{\"status\":{\"loadBalancer\":{\"ingress\":[{\"hostname\":\"${HOST}\"}]}}}"
+              echo "gateway Service status patched with ${HOST}"

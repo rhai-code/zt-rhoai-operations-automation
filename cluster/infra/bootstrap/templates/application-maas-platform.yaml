@@ -1,0 +1,40 @@
+{{ if .Values.maasPlatform.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: maas-platform
+  namespace: openshift-gitops
+spec:
+  project: infra
+  source:
+    repoURL: {{ .Values.maasPlatform.git.repoURL }}
+    targetRevision: {{ .Values.maasPlatform.git.targetRevision }}
+    path: {{ .Values.maasPlatform.git.path }}
+    helm:
+      valuesObject:
+        deployer:
+          domain: {{ .Values.deployer.domain }}
+        gatewayMode: {{ .Values.maasPlatform.gatewayMode }}
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      enabled: true
+      selfHeal: true
+    syncOptions:
+      # ServerSideApply keeps Git the source of truth for the plain resources.
+      # The hook-Job patches (Authorino volumes, gateway Service status, DSC
+      # modelsAsAService, dashboard flags) are not in Git — never reverted.
+      - ServerSideApply=true
+      # Wave 2 resources (Kuadrant CR, activation CRs, telemetry CRs) are gated
+      # by the operator-crs-wait Job (wave 1), which confirms the CSVs and CRDs
+      # first; SkipDryRunOnMissingResource + retry bridge any residual gap.
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}

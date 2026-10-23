@@ -1,0 +1,57 @@
+---
+# Red Hat Connectivity Link (Kuadrant/Authorino) + cert-manager operator
+# subscriptions ONLY. The Kuadrant CR is applied by ArgoCD AFTER the RHCL CSV
+# registers its CRDs (see operator-crs-wait + wave 2 — applying it in the same
+# pass races CRD registration and fails with "no matches for kind Kuadrant").
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager-operator
+# NOTE: the OperatorGroup is intentionally absent. These lab clusters already
+# ship one (`cert-manager-operator-og`) in this namespace, and a namespace may
+# hold only ONE OperatorGroup — creating a second makes OLM refuse to resolve
+# the CSV ("csv created in namespace with multiple operatorgroups") and the
+# cert-manager CSV lands in phase Failed. For clusters that do NOT
+# pre-provision one, add it only if
+#   oc get operatorgroup -n cert-manager-operator
+# returns nothing:
+# ---
+# apiVersion: operators.coreos.com/v1
+# kind: OperatorGroup
+# metadata:
+#   name: cert-manager-operator
+#   namespace: cert-manager-operator
+# spec:
+#   targetNamespaces:
+#     - cert-manager-operator
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: openshift-cert-manager-operator
+  namespace: cert-manager-operator
+spec:
+  channel: stable-v1
+  installPlanApproval: Automatic
+  name: openshift-cert-manager-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+---
+# Red Hat Connectivity Link operator (Kuadrant). Installs cluster-wide
+# (openshift-operators is the global operators namespace).
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhcl-operator
+  namespace: openshift-operators
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: rhcl-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  config:
+    env:
+      - name: AUTH_SERVICE_TIMEOUT
+        value: "10s"

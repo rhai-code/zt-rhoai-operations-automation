@@ -1,0 +1,24 @@
+---
+# DSCInitialization — must reconcile before the DataScienceCluster (wave 1 < 2).
+# v2 API: the CRD's storage version (the operator migrates v1 objects to v2, so
+# Git-managed objects use v2 to diff clean against the live state).
+apiVersion: dscinitialization.opendatahub.io/v2
+kind: DSCInitialization
+metadata:
+  name: default-dsci
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  applicationsNamespace: redhat-ods-applications
+  monitoring:
+    alerting: {}
+    managementState: Managed
+    metrics:
+      replicas: 1
+      storage:
+        retention: 90d
+        size: 5Gi
+    namespace: redhat-ods-monitoring
+  trustedCABundle:
+    managementState: Managed
+    customCABundle: ""

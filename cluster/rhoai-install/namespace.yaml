@@ -1,0 +1,9 @@
+---
+# The RHOAI operator namespace. Git-owned rather than relying on the operator
+# to create it (Module 1: operators as code).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redhat-ods-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"

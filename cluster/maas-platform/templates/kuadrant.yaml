@@ -1,0 +1,29 @@
+---
+# The Kuadrant CR — Git-managed (custom resources as code). ArgoCD applies it at
+# wave 2, AFTER the operator-crs-wait Job (wave 1) has confirmed the RHCL CSV is
+# Succeeded and the kuadrants CRD is Established. Applying it in the same pass
+# as the subscriptions races CRD registration and fails with
+# "no matches for kind Kuadrant".
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: kuadrant.io/v1beta1
+kind: Kuadrant
+metadata:
+  name: kuadrant
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  # Enable observability so the operator creates the ServiceMonitor/PodMonitor
+  # set that scrapes the Kuadrant data-plane (Limitador, Authorino) and
+  # control-plane metrics into monitoring. This is what surfaces
+  # per-subscription token usage in the RHOAI "Usage" dashboard. Without it the
+  # Kuadrant CR ships spec.observability: {} and none of those monitors are
+  # created.
+  observability:
+    enable: true

@@ -1,0 +1,37 @@
+{{ if .Values.rhoaiInstall.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rhoai-install
+  namespace: openshift-gitops
+spec:
+  project: infra
+  source:
+    repoURL: {{ .Values.rhoaiInstall.git.repoURL }}
+    targetRevision: {{ .Values.rhoaiInstall.git.targetRevision }}
+    path: {{ .Values.rhoaiInstall.git.path }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: redhat-ods-operator
+  syncPolicy:
+    automated:
+      enabled: true
+      selfHeal: true
+    syncOptions:
+      # ServerSideApply keeps Git the source of truth for the Subscription and
+      # the platform CRs (DSCI/DSC). SSA only owns what Git declares — the
+      # operator-managed DSC extras and the maasPlatform hook-Job patches
+      # (modelsAsAService, mlflowoperator) are never reverted.
+      - ServerSideApply=true
+      # The rhods CRDs are installed by the operator in response to the
+      # Subscription (~2-3 min). SkipDryRunOnMissingResource + retry bridge the
+      # gap; the DSCI/DSC apply once the CRDs exist.
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}

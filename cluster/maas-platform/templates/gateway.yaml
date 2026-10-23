@@ -1,0 +1,140 @@
+{{ if eq .Values.gatewayMode "clusterip" -}}
+---
+# ClusterIP gateway mode (default for RHDP/bare-metal — no LoadBalancer
+# provider).
+#
+# Uses data-science-gateway-class (the same class as RHOAI's built-in
+# data-science-gateway) instead of openshift-default. This class properly
+# exposes the external Route hostname in status so the maas-api can discover
+# the gateway URL.
+#
+# The Route (route.yaml) exposes the gateway externally with Edge TLS
+# termination, and the gateway-status hook Job patches the Service status with
+# the Route hostname (see the options ConfigMap comment).
+---
+# Tells the openshift.io/gateway-controller/v1 how to create the gateway
+# Service.
+#
+# Why LoadBalancer instead of ClusterIP:
+#   On clusters WITHOUT a cloud LB provider (RHDP, bare-metal) the service stays
+#   <pending> externally, but a LoadBalancer service DOES get a ClusterIP —
+#   traffic via the Route still reaches the gateway through the ClusterIP. The
+#   advantage over ClusterIP: after deploying we patch
+#   status.loadBalancer.ingress with the Route hostname (the gateway-status hook
+#   Job), which causes the gateway controller to set that hostname in
+#   gateway.status.addresses. The maas-api reads gateway.status.addresses to
+#   discover its external URL; without an external hostname there it returns
+#   500 "Unable to determine external hostname" and the dashboard API keys page
+#   shows "maas-api is not available".
+#
+# The Secret name MUST match the certificateRefs in gateway.yaml.
+# The ConfigMap name follows <gateway-name>-config convention used by
+# data-science-gateway-class.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maas-default-gateway-config
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  service: |
+    metadata:
+      annotations:
+        service.beta.openshift.io/serving-cert-secret-name: "maas-gw-service-tls"
+    spec:
+      type: LoadBalancer
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  # The MaaS controller hardcodes this name/namespace (GATEWAY env) — do not
+  # rename.
+  name: maas-default-gateway
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    opendatahub.io/managed: "false"
+    security.opendatahub.io/authorino-tls-bootstrap: "true"
+  labels:
+    app.kubernetes.io/name: maas
+    app.kubernetes.io/instance: maas-default-gateway
+    app.kubernetes.io/component: gateway
+    kuadrant.io/gateway: "true"
+    opendatahub.io/managed: "false"
+spec:
+  gatewayClassName: data-science-gateway-class
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: maas-default-gateway-config
+  listeners:
+    - name: https
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: maas-gw-service-tls
+{{- else -}}
+---
+# LoadBalancer gateway mode — for clusters with a cloud/MetalLB LoadBalancer
+# provider (AWS/ROSA/OSD, or on-prem with MetalLB). The Gateway controller
+# creates a Service of type LoadBalancer that receives an external address, and
+# the listener terminates client TLS with the cluster wildcard certificate.
+#
+# On a cluster WITHOUT a LoadBalancer provider this Service stays <pending> and
+# the Gateway never reaches Programmed=True — use the clusterip mode instead.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: openshift-default
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  controllerName: "openshift.io/gateway-controller/v1"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  # The MaaS controller hardcodes this name/namespace (GATEWAY env) — do not
+  # rename.
+  name: maas-default-gateway
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    opendatahub.io/managed: "false"
+    # Lets the ODH/Authorino stack bootstrap gateway TLS wiring automatically.
+    security.opendatahub.io/authorino-tls-bootstrap: "true"
+  labels:
+    app.kubernetes.io/name: maas
+    app.kubernetes.io/instance: maas-default-gateway
+    app.kubernetes.io/component: gateway
+    kuadrant.io/gateway: "true"
+    opendatahub.io/managed: "false"
+spec:
+  gatewayClassName: openshift-default
+  listeners:
+    - name: https
+      hostname: "maas.{{ .Values.deployer.domain }}"
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          # Clusters provisioned with cert-manager ship a wildcard cert in this
+          # secret; verify with: oc -n openshift-ingress get secret
+          # cert-manager-ingress-cert
+          - group: ""
+            kind: Secret
+            name: cert-manager-ingress-cert
+{{- end }}

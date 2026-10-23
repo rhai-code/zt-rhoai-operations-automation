@@ -7,10 +7,25 @@ Automation for the **RHOAI 3.5 Operations Workshop**. Two layers:
    Values files: `values-rhoai-operations{,-fde2}.yaml`. Targets:
    `make template|deploy|status` (see below).
 
-2. **Cluster layer** (`cluster/`) — GitOps app-of-apps for the workshop's infra:
-   an in-cluster LDAP directory (FreeIPA, FEDORACAPITAL.IO) federated into the
-   EXISTING Keycloak (rhbk), so persona users + groups arrive in OpenShift via
-   the OAuth groups claim. See [`cluster/START_HERE.md`](cluster/START_HERE.md)
+2. **Cluster layer** (`cluster/`) — GitOps app-of-apps for the workshop's
+   platform + infra:
+
+   - **RHOAI install** (`cluster/rhoai-install/`) — the operator
+     (stable-3.5), DSCInitialization and DataScienceCluster, Git-owned
+     ("operators as code" + "custom resources as code"). The MaaS
+     `aigateway.modelsAsAService` component is deliberately NOT in the Git DSC:
+     the maas-platform app enables it once the gateway is up.
+   - **MaaS platform** (`cluster/maas-platform/`) — RHCL (Kuadrant) +
+     cert-manager operators, the `maas-default-gateway`, the MaaS PostgreSQL,
+     the serving-path (LWS/JobSet) + observability operators, user workload
+     monitoring, the MaaS telemetry, and the DSC/dashboard MaaS enablement.
+     A Helm chart: the Route host and gateway status patch need the cluster
+     apps domain (`deployer.domain`, set at the one-time bootstrap apply).
+   - **Infra** (`cluster/infra/`) — an in-cluster LDAP directory (FreeIPA,
+     FEDORACAPITAL.IO) federated into the EXISTING Keycloak (rhbk), so persona
+     users + groups arrive in OpenShift via the OAuth groups claim.
+
+   See [`cluster/START_HERE.md`](cluster/START_HERE.md)
    for the bootstrap steps and verification.
 
 ## Showroom layer usage

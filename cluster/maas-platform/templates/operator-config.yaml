@@ -1,0 +1,26 @@
+---
+# Activation CRs for the serving-path operators. Each operator watches for a
+# singleton CR named `cluster` and, once created, rolls out its controller (the
+# LeaderWorkerSet and JobSet controllers that KServe's LLMInferenceService pods
+# depend on). Git-managed at wave 2, AFTER the operator-crs-wait Job (wave 1)
+# confirms the CSVs are Succeeded and these CRDs are Established.
+apiVersion: operator.openshift.io/v1
+kind: LeaderWorkerSetOperator
+metadata:
+  name: cluster
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  managementState: Managed
+  logLevel: Normal
+  operatorLogLevel: Normal
+---
+apiVersion: operator.openshift.io/v1
+kind: JobSetOperator
+metadata:
+  name: cluster
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  logLevel: Normal
+  operatorLogLevel: Normal

@@ -1,9 +1,14 @@
 # Cluster Layer
 
-The `cluster/` directory manages the workshop's infra as GitOps — an app-of-apps
-entry chart that ArgoCD renders into child Applications. Currently the infra
-layer only: an in-cluster FreeIPA directory wired into OpenShift via the
-OCP-native LDAP identity provider.
+The `cluster/` directory manages the workshop's platform + infra as GitOps — an
+app-of-apps entry chart that ArgoCD renders into child Applications:
+
+- the **platform layer**: RHOAI itself (operator, DSCInitialization,
+  DataScienceCluster) and the MaaS platform stack (RHCL/Kuadrant, gateway,
+  PostgreSQL, observability + serving-path operators, telemetry) — ported from
+  the deploy-configure workshop's manually applied manifests; plus
+- the **infra layer**: an in-cluster FreeIPA directory wired into OpenShift via
+  the OCP-native LDAP identity provider.
 
 ---
 
@@ -54,8 +59,10 @@ spec:
 EOF
 ```
 
-ArgoCD then creates: AppProject `infra` → `freeipa` Application → `ops-ldap`
-Application (sync hooks run in wave order).
+ArgoCD then creates: AppProject `infra` → `rhoai-install` Application (RHOAI
+operator + DSCI/DSC) → `maas-platform` Application (MaaS stack, hook Jobs in
+wave order) → `freeipa` Application → `ops-ldap` Application (sync hooks run in
+wave order).
 
 ---
 
@@ -65,8 +72,20 @@ Application (sync hooks run in wave order).
 bootstrap-ops Application (one-time, applied by hand)
   └── cluster/infra/bootstrap/            (app-of-apps entry chart)
         ├── AppProject: infra
-        ├── freeipa Application            (cluster/infra/freeipa/)
-        └── ops-ldap Application           (cluster/infra/ops-ldap/)
+        ├── rhoai-install Application     (cluster/rhoai-install/)
+        │     ├── ns + OperatorGroup + Subscription (stable-3.5)
+        │     ├── DSCInitialization (wave 1)
+        │     └── DataScienceCluster (wave 2; modelsAsAService NOT in Git)
+        ├── maas-platform Application     (cluster/maas-platform/, Helm chart)
+        │     ├── wave 0  subs (cert-manager, rhcl, LWS, JobSet) + trust CMs
+        │     │           + gateway + Route + postgres + UWM
+        │     │           + postgres-secrets hook Job (create-if-absent)
+        │     ├── wave 1  operator-crs-wait hook Job (CSVs Succeeded + CRDs)
+        │     ├── wave 2  Kuadrant CR + LWS/JobSet activation CRs + telemetry
+        │     ├── wave 3  authorino-trust + gateway-status hook Jobs
+        │     └── wave 4  dsc-maas-enable + dashboard-config hook Jobs
+        ├── freeipa Application           (cluster/infra/freeipa/)
+        └── ops-ldap Application          (cluster/infra/ops-ldap/)
               ├── sync hooks (wave order, idempotent, re-run on every sync):
               │   ├── wave 1  freeipa-populate    (persona users/groups in FreeIPA)
               │   ├── wave 2  freeipa-ca          (FreeIPA CA → ConfigMap, IdP ca ref)
@@ -78,10 +97,14 @@ bootstrap-ops Application (one-time, applied by hand)
                   └── group-rhods-admins Group    (operator metadata, Git-owned)
 ```
 
-The `freeipa` Application syncs as a normal workload. The wave 1–4 Jobs are
-ArgoCD sync hooks — each poll-waits for its dependency (FreeIPA ready).
-`ldap-group-sync` is a CronJob that re-runs on schedule, keeping the OpenShift
-groups in step with FreeIPA membership.
+The `rhoai-install` Application syncs as a normal workload (ns → Subscription →
+DSCI → DSC in ArgoCD sync-waves; the DSC is Git-owned). The `maas-platform`
+Application's hook Jobs each poll-wait for their dependency: RHCL/LWS/JobSet
+CSVs → Kuadrant CR + activation CRs + telemetry → Authorino trust + gateway
+status → MaaS enablement + dashboard flags. The `freeipa` Application syncs as
+a normal workload. The wave 1–4 Jobs are ArgoCD sync hooks — each poll-waits
+for its dependency (FreeIPA ready). `ldap-group-sync` is a CronJob that re-runs
+on schedule, keeping the OpenShift groups in step with FreeIPA membership.
 
 ---
 
@@ -108,16 +131,47 @@ developer — logs in to OpenShift fine and gets the RHOAI "Access denied" page.
 
 ```
 cluster/
+├── rhoai-install/                            # RHOAI operator + platform CRs (Git-owned)
+│   ├── kustomization.yaml
+│   ├── namespace.yaml, operatorgroup.yaml, subscription.yaml  # stable-3.5, wave 0
+│   ├── dsci.yaml                             # DSCInitialization (v2, wave 1)
+│   └── dsc.yaml                              # DataScienceCluster (v2, wave 2)
+│                                             #   modelsAsAService NOT in Git — the
+│                                             #   maas-platform hook Job enables it
+├── maas-platform/                            # MaaS platform stack (Helm chart)
+│   ├── values.yaml                           # deployer.domain + gatewayMode (from bootstrap)
+│   └── templates/
+│       ├── connectivity-link.yaml            # cert-manager + RHCL subscriptions (no OG)
+│       ├── serving-operators.yaml            # LWS + JobSet subscriptions (OwnNamespace OGs)
+│       ├── kuadrant.yaml                     # kuadrant-system ns + Kuadrant CR (wave 2)
+│       ├── operator-config.yaml              # LWS/JobSet activation CRs (wave 2)
+│       ├── authorino-trust-cms.yaml          # service CA trust ConfigMaps (wave 0)
+│       ├── gateway.yaml                      # maas-default-gateway (clusterip|loadbalancer)
+│       ├── route.yaml                        # maas.<domain> Route (clusterip mode)
+│       ├── postgres.yaml                     # PVC + Deployment + Service (wave 0)
+│       ├── uwm.yaml                          # cluster-monitoring-config (UWM on)
+│       ├── telemetry.yaml                    # Istio Telemetry + Kuadrant TelemetryPolicy
+│       ├── rbac.yaml                         # maas-setup SA + ClusterRoles (resourceNames)
+│       ├── job-postgres-secrets.yaml         # wave 0 — secrets create-if-absent
+│       ├── job-operator-crs-wait.yaml        # wave 1 — CSVs Succeeded + CRDs gate
+│       ├── job-authorino-trust.yaml          # wave 3 — Authorino CR volumes patch
+│       ├── job-gateway-status.yaml           # wave 3 — svc status with the Route host
+│       ├── job-dsc-maas-enable.yaml          # wave 4 — DSC modelsAsAService: Managed
+│       └── job-dashboard-config.yaml         # wave 4 — dashboard MaaS/observability flags
 ├── infra/
 │   ├── bootstrap/                          # app-of-apps entry chart
 │   │   ├── values.yaml                     # workload flags + git defaults (heavily commented)
 │   │   └── templates/
 │   │       ├── appproject-infra.yaml
+│   │       ├── application-rhoai-install.yaml
+│   │       ├── application-maas-platform.yaml
 │   │       ├── application-freeipa.yaml
 │   │       ├── application-ops-ldap.yaml
 │   │       ├── application-maas-model.yaml
 │   │       ├── application-mlflow.yaml
-│   │       └── application-model-registry.yaml
+│   │       ├── application-model-registry.yaml
+│   │       ├── application-kueue.yaml
+│   │       └── application-oadp.yaml
 │   ├── freeipa/                            # FreeIPA server (plain manifests)
 │   │   ├── values.yaml
 │   │   └── templates/
@@ -164,6 +218,8 @@ Plus `cluster/model-registry/` — the namespaced ModelRegistry instance CR
 
 | Workload | Values key | Purpose |
 |----------|-----------|---------|
+| `rhoaiInstall` | `rhoaiInstall` | RHOAI operator (stable-3.5) + DSCI + DataScienceCluster (Git-owned, v2) |
+| `maasPlatform` | `maasPlatform` | MaaS platform stack: RHCL/Kuadrant, gateway, PostgreSQL, LWS/JobSet + observability operators, telemetry, MaaS enablement |
 | `freeipa` | `freeipa` | In-cluster LDAP directory (FEDORACAPITAL.IO), plain-manifest StatefulSet |
 | `opsLdap` | `opsLdap` | Identity setup: persona population, CA, OCP LDAP IdP, groups claim, group sync |
 | `maasModel` | `maasModel` | Lending model via MaaS (LLMInferenceService + MaaSModelRef in rhoai-lending), Module 2 Ex 6 |
@@ -176,18 +232,48 @@ Plus `cluster/model-registry/` — the namespaced ModelRegistry instance CR
 
 ## Secrets
 
-Nothing in git. The FreeIPA admin/ds password (also the LDAP bind password —
-the `oauth-ldap-idp` job creates the `freeipa-ldap-bind-password` Secret from
-it) is set at the one-time bootstrap apply from the shell — it rides the
-bootstrap Application's on-cluster helm.values through to the child
-Applications. The Keycloak (rhbk) realm is pre-set by the cluster provisioning
-and is only used for the platform admin — no federation, no Keycloak admin
-credentials needed here.
+Nothing secret in git. Two kinds of values ride outside git:
+
+- **Passwords** (FreeIPA admin/ds, also the LDAP bind password — the
+  `oauth-ldap-idp` job creates the `freeipa-ldap-bind-password` Secret from it)
+  are set at the one-time bootstrap apply from the shell — they ride the
+  bootstrap Application's on-cluster helm.values through to the child
+  Applications. The Keycloak (rhbk) realm is pre-set by the cluster
+  provisioning and is only used for the platform admin — no federation, no
+  Keycloak admin credentials needed here.
+- **The MaaS database password** (`postgres-creds` + `maas-db-config` Secrets in
+  redhat-ods-applications) is generated at apply time by the maas-platform
+  `postgres-secrets` hook Job (create-if-absent, never overwritten — the DB
+  keeps its bootstrapped password across syncs).
+
+The cluster apps domain (`deployer.domain`) is likewise injected at the
+one-time bootstrap apply — it renders the MaaS Route host and the gateway
+status patch, and is never committed.
 
 ## Verification (after sync)
 
 ```bash
 oc -n openshift-gitops get applications.argoproj.io
+oc -n openshift-gitops get app rhoai-install          # synced; operator + CRs Git-owned
+oc get subscription rhods-operator -n redhat-ods-operator -o jsonpath='{.spec.channel}{"\n"}'
+                                                      # stable-3.5
+oc get csv -n redhat-ods-operator | grep rhods        # rhods-operator (Succeeded)
+oc get dsci,dsc                                       # default-dsci Ready, default-dsc True
+oc -n openshift-gitops get app maas-platform          # synced after the hook Jobs complete
+oc -n kuadrant-system get jobs                        # the 5 hook Jobs Completed
+oc -n kuadrant-system get kuadrant                    # Kuadrant CR (observability enabled)
+oc get csv -n openshift-operators | grep -Ei 'kuadrant|authorino|limitador'
+oc -n openshift-ingress get gateway,route             # maas-default-gateway Programmed + maas-gateway-route
+oc -n openshift-ingress get gateway maas-default-gateway -o jsonpath='{.status.addresses}{"\n"}'
+                                                      # maas.<domain> (patched by the gateway-status Job)
+oc -n redhat-ods-applications get deploy,secret | grep -Ei 'postgres|maas'
+                                                      # postgres 1/1 + maas-controller; secrets exist
+oc get dsc default-dsc -o jsonpath='{.spec.components.aigateway.modelsAsAService.managementState}{"\n"}'
+                                                      # Managed (via the dsc-maas-enable hook Job)
+oc -n redhat-ods-applications get odhdashboardconfig odh-dashboard-config -o jsonpath='{.spec.dashboardConfig}{"\n"}'
+                                                      # modelAsService/observabilityDashboard/genAiStudio/enablement true
+oc -n openshift-monitoring get cm cluster-monitoring-config -o jsonpath='{.data.config\.yaml}{"\n"}'
+                                                      # enableUserWorkload: true
 oc -n freeipa get pods,routes                       # FreeIPA healthy (15+ min install)
 oc get oauth cluster -o jsonpath='{range .spec.identityProviders[*]}{.name}{"\t"}{.type}{"\n"}{end}'
                                                     # freeipa-ldap first (LDAP), rhbk second

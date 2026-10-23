@@ -1,0 +1,60 @@
+---
+# Per-subscription MaaS telemetry — powers the RHOAI dashboard's token-usage
+# views. Both CRs target the MaaS gateway; Git-managed at wave 2, after the
+# operator-crs-wait Job confirms the Kuadrant + Istio telemetry CRDs exist.
+---
+# Istio Telemetry: adds a `subscription` tag (from the x-maas-subscription
+# request header) to the gateway's REQUEST_DURATION metric, so latency can be
+# broken down per MaaS subscription. Lives in openshift-ingress alongside the
+# MaaS gateway it selects.
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: latency-per-subscription
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  selector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: maas-default-gateway
+  metrics:
+    - providers:
+        - name: prometheus
+      overrides:
+        - match:
+            metric: REQUEST_DURATION
+            mode: CLIENT_AND_SERVER
+          tagOverrides:
+            subscription:
+              operation: UPSERT
+              value: request.headers["x-maas-subscription"]
+---
+# Kuadrant TelemetryPolicy: labels the gateway's token-usage metrics with
+# identity fields pulled from the authenticated request (model, user,
+# subscription, org, cost center). The MaaSSubscription's tokenMetadata supplies
+# placeholder values for costCenter/organizationId so the CEL label expressions
+# stay valid (RHCL evaluates them strictly; null values stop Limitador
+# recording the authorized_hits counter and the "Usage" dashboard stays empty).
+apiVersion: extensions.kuadrant.io/v1alpha1
+kind: TelemetryPolicy
+metadata:
+  name: maas-telemetry
+  namespace: openshift-ingress
+  labels:
+    app.kubernetes.io/part-of: maas-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  metrics:
+    default:
+      labels:
+        model: responseBodyJSON("/model")
+        user: auth.identity.userid
+        subscription: auth.identity.selected_subscription
+        organization_id: auth.identity.subscription_info.organizationId
+        cost_center: auth.identity.subscription_info.costCenter
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: maas-default-gateway

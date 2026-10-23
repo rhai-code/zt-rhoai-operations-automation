@@ -66,6 +66,39 @@ opsLdap:
   password: REPLACE_AT_APPLY # set at the one-time apply — never committed
 
 # ---------------------------------------------------------------------------
+# rhoai-install — the RHOAI operator + platform CRs (DSCInitialization +
+# DataScienceCluster), Git-owned ("operators as code" + "custom resources as
+# code", Module 1). Base prerequisite for every module: the serving platform
+# (kserve), the MaaS aigateway component, model registry, workbenches, the
+# MLflow operator. NOTE: aigateway.modelsAsAService is NOT in the Git DSC —
+# the maasPlatform app's dsc-maas-enable hook Job enables it once the gateway
+# is up (a Git-owned field would flip-flop against that patch).
+# ---------------------------------------------------------------------------
+rhoaiInstall:
+  enabled: true
+  git:
+    path: cluster/rhoai-install
+    <<: *git_defaults
+
+# ---------------------------------------------------------------------------
+# maas-platform — the Models-as-a-Service platform stack: RHCL (Kuadrant) +
+# cert-manager operators, the maas-default-gateway, the MaaS PostgreSQL, the
+# serving-path (LWS/JobSet) + observability operators, user workload
+# monitoring, the MaaS telemetry, and the dashboard/MaaS DSC enablement.
+# Prerequisite for cluster/maas-model (the Lending model attaches to
+# maas-default-gateway). A Helm chart: the Route host and the gateway status
+# patch need the cluster apps domain (deployer.domain, set at the one-time
+# bootstrap apply — never in git). gatewayMode: clusterip (RHDP/bare-metal,
+# default) | loadbalancer (cloud/MetalLB).
+# ---------------------------------------------------------------------------
+maasPlatform:
+  enabled: true
+  git:
+    path: cluster/maas-platform
+    <<: *git_defaults
+  gatewayMode: clusterip
+
+# ---------------------------------------------------------------------------
 # maas-model — the Lending model published through MaaS (LLMInferenceService +
 # MaaSModelRef in rhoai-lending). Pre-setup for Module 2 Exercise 6: the MaaS
 # platform stack (gateway, maas-api, authorino) is deployed by the platform

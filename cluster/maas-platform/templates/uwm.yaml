@@ -1,0 +1,14 @@
+---
+# Enable User Workload Monitoring so served-model metrics (vLLM engine,
+# remapped kserve_vllm) are scraped. The ops workshop's observe & debug module
+# inspects this ConfigMap.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  config.yaml: |
+    enableUserWorkload: true

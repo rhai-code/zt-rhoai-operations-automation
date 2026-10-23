@@ -1,0 +1,67 @@
+---
+# Serving-path operators for gateway-native KServe (LLMInferenceService), used
+# by MaaS (the Lending model, Module 2 Ex 6). Subscriptions + OperatorGroups —
+# safe to apply together. The activation CRs (JobSetOperator /
+# LeaderWorkerSetOperator) are applied by ArgoCD AFTER the CSVs register their
+# CRDs (operator-crs-wait Job + wave 2).
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-lws-operator
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-lws-operator
+  namespace: openshift-lws-operator
+spec:
+  # This operator only supports OwnNamespace/SingleNamespace install modes; an
+  # empty OperatorGroup defaults to AllNamespaces and the CSV fails with
+  # "AllNamespaces InstallModeType not supported". Target its own namespace.
+  targetNamespaces:
+    - openshift-lws-operator
+  upgradeStrategy: Default
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: leader-worker-set
+  namespace: openshift-lws-operator
+spec:
+  # The only published channel is stable-v1.0 (verify with:
+  #   oc get packagemanifest leader-worker-set -n openshift-marketplace \
+  #     -o jsonpath='{.status.channels[*].name}')
+  channel: stable-v1.0
+  installPlanApproval: Automatic
+  name: leader-worker-set
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-jobset-operator
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-jobset-operator
+  namespace: openshift-jobset-operator
+spec:
+  # OwnNamespace only (see the LWS OperatorGroup above).
+  targetNamespaces:
+    - openshift-jobset-operator
+  upgradeStrategy: Default
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: job-set
+  namespace: openshift-jobset-operator
+spec:
+  channel: stable-v1.0
+  installPlanApproval: Automatic
+  name: job-set
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace

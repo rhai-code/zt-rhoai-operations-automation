@@ -1,0 +1,69 @@
+---
+# Make Authorino trust the OpenShift service-serving CA so its MaaS auth callouts
+# succeed.
+#
+# WHY THIS EXISTS (RHOAI 3.4.3 MaaS Tech Preview):
+#   The MaaS AuthPolicy compiled onto the gateway drives two HTTPS metadata
+#   callouts from Authorino back to the maas-api service on its :8443 serving
+#   port:
+#     POST https://maas-api.redhat-ods-applications.svc.cluster.local:8443/internal/v1/subscriptions/select
+#     POST https://maas-api.redhat-ods-applications.svc.cluster.local:8443/internal/v1/api-keys/validate
+#   maas-api's :8443 cert is signed by the cluster's *service-serving* CA, but
+#   the RHEL9-based Authorino image only ships the public root bundle. The
+#   subscription-info fetch therefore fails TLS verification:
+#     "cannot fetch metadata" ... tls: failed to verify certificate:
+#       x509: certificate signed by unknown authority
+#   The `subscription-valid` authorization rule then denies (403), maas-api's
+#   access probe drops the model, and `GET /maas-api/v1/models` returns an EMPTY
+#   list (and API-key model calls 403).
+#
+# THE FIX:
+#   Mount the service-serving CA (and the cluster's trusted root bundle) into
+#   Authorino's Go certificate directory (/etc/pki/tls/certs). Go loads
+#   /etc/pki/tls/certs/ca-bundle.crt as its root file AND additionally appends
+#   every cert file it finds while scanning that directory, so dropping
+#   service-ca.crt alongside ca-bundle.crt adds the service-serving CA to the
+#   trust pool. Mounting a ConfigMap over /etc/pki/tls/certs HIDES the image's
+#   built-in ca-bundle.crt, so we must re-supply BOTH: the trusted root bundle
+#   (to preserve default trust) and the service CA.
+#
+#   These two ConfigMaps are populated automatically by OpenShift operators from
+#   the inject-cabundle annotation / inject-trusted-cabundle label — we create
+#   them here (rather than reuse odh-trusted-ca-bundle /
+#   openshift-service-ca.crt) so the workshop does not depend on another
+#   component having provisioned those in kuadrant-system.
+#
+#   The Authorino CR itself is created by the Kuadrant operator; the
+#   authorino-trust hook Job (wave 3) patches its spec.volumes.items to mount
+#   these ConfigMaps (Authorino's CRD exposes no env/command, only
+#   ConfigMap/Secret volume mounts). Leave the listener/oidcServer TLS DISABLED
+#   and do NOT set mtls.authorino on the Kuadrant CR: kuadrant-system has no
+#   Istio sidecars, so the Kuadrant ext_authz EnvoyFilter talks to Authorino
+#   over PLAINTEXT gRPC (:50051). Enabling TLS on either breaks ext_authz and
+#   turns every authorized request into a 500.
+#
+#   Newer RHOAI/MaaS builds replace these HTTPS callouts with TokenReview +
+#   SubjectAccessReview (no service-CA TLS callout), at which point this trust
+#   bundle can be dropped.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authorino-trusted-ca-bundle
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    # The cluster-network-operator injects the merged trusted root bundle into
+    # `ca-bundle.crt`.
+    config.openshift.io/inject-trusted-cabundle: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authorino-service-ca
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    # The service-ca operator injects the service-serving CA into
+    # `service-ca.crt`.
+    service.beta.openshift.io/inject-cabundle: "true"

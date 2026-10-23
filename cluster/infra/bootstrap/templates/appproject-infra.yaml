@@ -6,7 +6,7 @@ metadata:
   name: infra
   namespace: openshift-gitops
 spec:
-  description: Infra layer of the RHOAI Operations workshop (LDAP directory + identity setup + MaaS model + MLflow + Kueue + OADP)
+  description: Infra + platform layer of the RHOAI Operations workshop (RHOAI install, MaaS platform, LDAP directory + identity setup, MaaS model, MLflow, Kueue, OADP)
   sourceRepos:
     - https://github.com/rhai-code/zt-rhoai-operations-automation
   destinations:
@@ -31,6 +31,21 @@ spec:
     # the namespace '*' whitelist doesn't apply)
     - group: mlflow.opendatahub.io
       kind: MLflow
+    # RHOAI platform CRs (Git-owned since the rhoai-install app):
+    # DSCInitialization must reconcile before the DataScienceCluster; both
+    # cluster-scoped. The DSC is Git-managed ("custom resources as code") —
+    # the aigateway.modelsAsAService + mlflowoperator components are NOT in the
+    # Git DSC (the maas-platform/mlflow hook Jobs merge-patch them).
+    - group: dscinitialization.opendatahub.io
+      kind: DSCInitialization
+    - group: datasciencecluster.opendatahub.io
+      kind: DataScienceCluster
+    # MaaS serving-path operator activation CRs (cluster-scoped singletons —
+    # the LWS/JobSet controllers that KServe's LLMInferenceService pods depend on)
+    - group: operator.openshift.io
+      kind: LeaderWorkerSetOperator
+    - group: operator.openshift.io
+      kind: JobSetOperator
     # Kueue: the cluster-scoped Kueue operator configuration CR — the RHBoK
     # operator waits for it before installing the kueue.x-k8s.io CRDs — and the
     # cluster-scoped demo queues (ClusterQueue/Cohort/ResourceFlavor; LocalQueue

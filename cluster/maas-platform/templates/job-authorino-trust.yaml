@@ -1,0 +1,47 @@
+---
+# Mounts the trust ConfigMaps (wave 0) into the Authorino deployment by
+# merge-patching the Kuadrant operator's Authorino CR.
+#
+# WHY A JOB AND NOT A MANIFEST: the Authorino CR is created by the Kuadrant
+# operator after the Kuadrant CR (wave 2) reconciles — it does not exist until
+# then, and its spec.volumes field is operator-owned. A merge patch touches
+# ONLY spec.volumes — no field-manager conflict (the mlflow dsc-patch pattern).
+#
+# Wave 3, after the Kuadrant CR (wave 2). Idempotent (merge patch of the same
+# values); BeforeHookCreation re-runs on every sync.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: maas-authorino-trust
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: maas-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: trust
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              # The Authorino CR is created by the Kuadrant operator after the
+              # Kuadrant CR (wave 2) reconciles.
+              until oc -n kuadrant-system get authorino authorino >/dev/null 2>&1; do
+                echo "waiting for the Authorino CR"; sleep 10
+              done
+              # Merge patch — touches ONLY spec.volumes (projected trust bundle:
+              # both ConfigMaps at /etc/pki/tls/certs, see authorino-trust-cms.yaml).
+              oc -n kuadrant-system patch authorino authorino --type=merge \
+                -p '{"spec":{"volumes":{"items":[{"name":"ca-trust","mountPath":"/etc/pki/tls/certs","configMaps":["authorino-trusted-ca-bundle","authorino-service-ca"]}]}}}'
+              # Gate: the operator re-rolls the deployment with the trust bundle;
+              # the MaaS auth callouts fail TLS verification without it.
+              oc -n kuadrant-system rollout status deploy/authorino --timeout=900s
+              echo "Authorino trust bundle mounted; deployment rolled out"

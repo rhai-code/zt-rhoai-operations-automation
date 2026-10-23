@@ -1,0 +1,54 @@
+---
+# Enables MaaS on the DataScienceCluster (aigateway.modelsAsAService: Managed)
+# via a MERGE PATCH.
+#
+# WHY A JOB AND NOT A MANIFEST: modelsAsAService is deliberately NOT in the
+# rhoai-install app's Git DSC. An ArgoCD SSA apply of the full DSC would claim
+# the field and flip it back to Removed on every sync while this Job re-patches
+# it to Managed (flip-flop). A merge patch touches ONLY this key — no prune, no
+# field-manager conflict (the mlflow dsc-patch pattern).
+#
+# Wave 4, AFTER the gateway-status Job (wave 3): the maas-api reads
+# gateway.status.addresses, so MaaS must only be enabled once the gateway
+# status carries the external hostname — otherwise the DSC blocks on
+# GatewayNotReady and maas-api 500s. The controller crash-loops until the
+# Kuadrant TokenRateLimitPolicy CRD exists — wave 1 gates on that. Idempotent
+# (merge patch); BeforeHookCreation re-runs on every sync.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: maas-dsc-enable
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      serviceAccountName: maas-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: dsc-enable
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              # Wait until the gateway status carries the external hostname
+              # (patched by the gateway-status Job, reflected by the gateway
+              # controller).
+              until [ -n "$(oc -n openshift-ingress get gateway maas-default-gateway \
+                -o jsonpath='{.status.addresses[0].value}' 2>/dev/null)" ]; do
+                echo "waiting for gateway.status.addresses"; sleep 15
+              done
+              # Merge patch — touches ONLY the aigateway.modelsAsAService key.
+              oc patch dsc default-dsc --type=merge \
+                -p '{"spec":{"components":{"aigateway":{"modelsAsAService":{"managementState":"Managed"}}}}}'
+              # Gate: the aigateway operator deploys maas-controller in
+              # response (the DB secrets + PostgreSQL are up from wave 0, and
+              # the Kuadrant CRDs from wave 2, so no crash-loop window).
+              oc -n redhat-ods-applications rollout status deploy/maas-controller --timeout=900s
+              echo "MaaS enabled (modelsAsAService: Managed); maas-controller rolled out"

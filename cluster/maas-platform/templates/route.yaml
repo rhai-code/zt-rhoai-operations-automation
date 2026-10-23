@@ -1,0 +1,24 @@
+{{ if eq .Values.gatewayMode "clusterip" -}}
+---
+# Exposes the ClusterIP gateway Service externally (clusterip mode only — the
+# loadbalancer mode exposes via the Gateway listener hostname). The Service name
+# is derived from <gateway-name>-<gatewayclass-name> by the gateway controller.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: maas-gateway-route
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  host: "maas.{{ .Values.deployer.domain }}"
+  to:
+    kind: Service
+    name: maas-default-gateway-data-science-gateway-class
+    weight: 100
+  port:
+    targetPort: https
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}

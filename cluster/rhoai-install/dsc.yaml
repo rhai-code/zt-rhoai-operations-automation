@@ -1,0 +1,69 @@
+---
+# The DataScienceCluster — RHOAI's platform configuration, Git-owned ("custom
+# resources as code", Module 1). Fields NOT listed here stay at the operator
+# default: SSA only owns what Git declares, so operator-managed extras
+# (llamastackoperator, mcplifecycleoperator, nim.airGapped, workbenchNamespace,
+# ...) are never reverted by a sync.
+#
+# TWO deliberate omissions:
+#
+# - aigateway.modelsAsAService is NOT in Git. The maas-platform app's
+#   dsc-maas-enable hook Job merge-patches it to Managed once the MaaS gateway
+#   is up. A Git-owned field would flip-flop against that patch (the install
+#   app's SSA re-applies Git on every sync while the hook Job re-patches) — the
+#   same reason the mlflow app patches mlflowoperator via a hook Job. Staging it
+#   also prevents the DSC blocking on GatewayNotReady before RHCL + the gateway
+#   exist (fresh clusters: the maas-platform app converges in parallel).
+#
+# - llamastackoperator is left at the operator default (Managed in 3.5): the
+#   Gen AI playground runs on the Llama Stack backend, and forcing Removed here
+#   would revert it.
+apiVersion: datasciencecluster.opendatahub.io/v2
+kind: DataScienceCluster
+metadata:
+  name: default-dsc
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  components:
+    # Required by the workshop
+    dashboard:
+      managementState: Managed
+    workbenches:
+      managementState: Managed
+    kserve:
+      managementState: Managed
+      nim:
+        managementState: Managed
+      rawDeploymentServiceConfig: Headless
+      # Deprecated in favour of aigateway.modelsAsAService — the one-directional
+      # CEL rule on this key blocks Removed -> Managed, so it stays Removed.
+      modelsAsService:
+        managementState: Removed
+    # MaaS: the aigateway component is Managed here; modelsAsAService is enabled
+    # by the maas-platform app once RHCL and the gateway exist (see above).
+    aigateway:
+      managementState: Managed
+    mlflowoperator:
+      managementState: Managed
+    aipipelines:
+      managementState: Managed
+    modelregistry:
+      managementState: Managed
+      registriesNamespace: rhoai-model-registries
+    # Not needed by the workshop — declared explicitly so the rendered state is
+    # reviewable in Git (the operator removes any component not in the final spec).
+    feastoperator:
+      managementState: Removed
+    kueue:
+      managementState: Removed
+    ogx:
+      managementState: Removed
+    ray:
+      managementState: Removed
+    trainer:
+      managementState: Removed
+    trainingoperator:
+      managementState: Removed
+    trustyai:
+      managementState: Removed

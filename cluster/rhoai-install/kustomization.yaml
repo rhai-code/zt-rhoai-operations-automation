@@ -1,0 +1,13 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# RHOAI operator + platform CRs (the base install). The DSCI must reconcile
+# before the DSC; kustomize resource order is NOT guaranteed under ArgoCD, so
+# the sync-waves on each resource order them (0 -> 1 -> 2).
+resources:
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  - dsci.yaml
+  - dsc.yaml
