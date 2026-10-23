@@ -1,0 +1,37 @@
+---
+# The RHOAI dashboard configuration, Git-managed directly (raw YAML — Module 1's
+# "OdhDashboardConfig resources" Raw-YAML example). Declares ONLY the flags this
+# workshop sets: ArgoCD's SSA owns what Git declares, so the operator-managed
+# fields (notebookController namespace/PVC size, the templateOrder /
+# templateDisablement / hardwareProfileOrder arrays) are never reverted. On a
+# fresh cluster the dashboard operator creates this CR with its defaults if
+# absent; either way ArgoCD converges the declared fields.
+apiVersion: opendatahub.io/v1alpha
+kind: OdhDashboardConfig
+metadata:
+  name: odh-dashboard-config
+  namespace: redhat-ods-applications
+  labels:
+    app.kubernetes.io/part-of: rhods-dashboard
+  annotations:
+    # The odhdashboardconfigs CRD is installed by the RHOAI operator (the
+    # rhoai-install app, syncing in parallel) — skip the dry-run until it
+    # exists; the app's retry bridges the gap.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  dashboardConfig:
+    # The operator's default-creation flag (matches the live CR).
+    disableTracking: false
+    # Surfaces the MaaS view (AI asset endpoints, API keys).
+    modelAsService: true
+    # Adds the "Observe & monitor -> Dashboard" nav — rendered from the RHOAI
+    # monitoring stack; the per-subscription token telemetry pipeline is wired
+    # by the maas-platform telemetry CRs (Telemetry + TelemetryPolicy).
+    observabilityDashboard: true
+    # Surfaces "Gen AI studio -> Playground" in the dashboard nav.
+    genAiStudio: true
+    # Part of the documented Gen AI studio enablement combo.
+    enablement: true
+  notebookController:
+    # The workbenches UI gate (the DSC workbenches component runs the backend).
+    enabled: true
