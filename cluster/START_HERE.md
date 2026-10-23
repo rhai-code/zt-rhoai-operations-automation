@@ -81,8 +81,10 @@ bootstrap-ops Application (one-time, applied by hand)
         │     │           + gateway + Route + postgres + UWM + Kuadrant CR
         │     │           + activation CRs + telemetry (CRD races bridged by
         │     │           SkipDryRunOnMissingResource + retry)
-        │     │           + postgres-secrets hook Job (create-if-absent)
-        │     ├── wave 1  authorino-trust + gateway-status hook Jobs
+        │     │           + postgres-secrets + gateway-status hook Jobs
+        │     │           (the gateway-status patch un-blocks the Gateway
+        │     │           health in the same wave — kind order CRs < Jobs)
+        │     ├── wave 1  authorino-trust hook Job
         │     └── wave 2  dsc-maas-enable hook Job (MaaS enablement)
         ├── freeipa Application           (cluster/infra/freeipa/)
         └── ops-ldap Application          (cluster/infra/ops-ldap/)

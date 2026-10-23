@@ -8,7 +8,7 @@
 # it to Managed (flip-flop). A merge patch touches ONLY this key — no prune, no
 # field-manager conflict (the mlflow dsc-patch pattern).
 #
-# Wave 2, AFTER the gateway-status Job (wave 1): the maas-api reads
+# Wave 2, AFTER the gateway-status Job (wave 0): the maas-api reads
 # gateway.status.addresses, so MaaS must only be enabled once the gateway
 # status carries the external hostname — otherwise the DSC blocks on
 # GatewayNotReady and maas-api 500s. The controller crash-loops until the
