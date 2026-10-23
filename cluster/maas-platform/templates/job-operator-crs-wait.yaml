@@ -5,10 +5,13 @@
 # same pass as the subscriptions races CRD registration and fails with
 # "no matches for kind" (see the connectivity-link comment).
 #
-# CSV names carry the version, so each is located by prefix. The istio
-# telemetries CRD ships with RHOAI serving (the rhoai-install app, parallel) —
-# the wait covers the whole window. Idempotent; BeforeHookCreation re-runs on
-# every sync.
+# CSV names carry the version, so each is located by prefix. `oc get csv -o
+# name` prints the fully-qualified resource name
+# (clusterserviceversion.operators.coreos.com/<name>.v<version>) — the prefix
+# is matched anywhere in it. The loops are bounded so the Job eventually fails
+# and retries (backoffLimit) instead of hanging forever. The istio telemetries
+# CRD ships with RHOAI serving (the rhoai-install app, parallel) — the wait
+# covers the whole window. Idempotent; BeforeHookCreation re-runs on every sync.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -35,23 +38,26 @@ spec:
               # Wait for an operator CSV (by name prefix — the name carries the
               # version) to reach Succeeded.
               wait_csv() {
-                local ns=$1 prefix=$2
-                until oc -n "$ns" get csv -o name | grep -q "^csv/${prefix}"; do
-                  echo "waiting for the ${prefix} CSV in ${ns}"; sleep 15
+                local ns=$1 prefix=$2 csv i
+                for i in $(seq 1 60); do
+                  csv=$(oc -n "$ns" get csv -o name 2>/dev/null | grep "${prefix}" | head -1 || true)
+                  if [ -n "$csv" ]; then
+                    echo "waiting for ${csv} to reach Succeeded"
+                    oc -n "$ns" wait --for=condition=Succeeded "$csv" --timeout=900s && return 0
+                    return 1
+                  fi
+                  echo "waiting for the ${prefix} CSV in ${ns} ($i/60)"; sleep 15
                 done
-                local csv
-                csv=$(oc -n "$ns" get csv -o name | grep "^csv/${prefix}" | head -1)
-                echo "waiting for ${csv} to reach Succeeded"
-                oc -n "$ns" wait --for=condition=Succeeded "$csv" --timeout=1200s
+                echo "the ${prefix} CSV never appeared"; return 1
               }
               wait_csv openshift-operators rhcl-operator
               wait_csv openshift-lws-operator leader-worker-set
               wait_csv openshift-jobset-operator job-set
               # The CRDs wave 2 applies — Kuadrant (RHCL CSV), the serving
               # operators (their CSVs), Istio telemetry (RHOAI serving).
-              oc wait --for=condition=Established crd/kuadrants.kuadrant.io --timeout=1200s
-              oc wait --for=condition=Established crd/leaderworkersetoperators.operator.openshift.io --timeout=1200s
-              oc wait --for=condition=Established crd/jobsetoperators.operator.openshift.io --timeout=1200s
-              oc wait --for=condition=Established crd/telemetries.telemetry.istio.io --timeout=1200s
-              oc wait --for=condition=Established crd/telemetrypolicies.extensions.kuadrant.io --timeout=1200s
+              oc wait --for=condition=Established crd/kuadrants.kuadrant.io --timeout=900s
+              oc wait --for=condition=Established crd/leaderworkersetoperators.operator.openshift.io --timeout=900s
+              oc wait --for=condition=Established crd/jobsetoperators.operator.openshift.io --timeout=900s
+              oc wait --for=condition=Established crd/telemetries.telemetry.istio.io --timeout=900s
+              oc wait --for=condition=Established crd/telemetrypolicies.extensions.kuadrant.io --timeout=900s
               echo "operator CSVs Succeeded; CRDs established"
