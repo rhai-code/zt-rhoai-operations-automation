@@ -44,13 +44,15 @@ rules:
     resourceNames: ["authorino"]
     verbs: ["get", "patch"]
   # gateway-status: read the Gateway (Programmed + addresses), patch the
-  # gateway Service STATUS with the Route hostname (subresource=status).
+  # gateway Service STATUS with the Route hostname. The status subresource is
+  # its own RBAC resource (services/status) — granting only "services" makes
+  # the --subresource=status patch Forbidden.
   - apiGroups: ["gateway.networking.k8s.io"]
     resources: ["gateways"]
     resourceNames: ["maas-default-gateway"]
     verbs: ["get"]
   - apiGroups: [""]
-    resources: ["services"]
+    resources: ["services", "services/status"]
     resourceNames: ["maas-default-gateway-data-science-gateway-class"]
     verbs: ["get", "patch"]
 ---
