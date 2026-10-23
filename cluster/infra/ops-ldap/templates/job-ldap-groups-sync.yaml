@@ -45,19 +45,24 @@ spec:
                   bindDN: "uid=admin,cn=users,cn=accounts,dc=fedoracapital,dc=io"
                   bindPassword: "$FREEIPA_PASSWORD"
                   insecure: true
+                  # NOTE: no query filter — the oc CLI rejects a filter when
+                  # the UID attribute is "dn" ("cannot specify a filter when
+                  # using dn as the UID attribute"). The baseDNs already scope
+                  # to the right subtrees and the whitelist narrows the groups
+                  # synced. (Floating ose-cli:latest pulled a stricter oc that
+                  # enforces this — the original filters broke every hourly
+                  # run.)
                   rfc2307:
                     groupsQuery:
                       baseDN: "cn=groups,cn=accounts,dc=fedoracapital,dc=io"
                       scope: sub
                       derefAliases: never
-                      filter: "(objectclass=groupofnames)"
                     groupUIDAttribute: dn
                     groupNameAttributes: ["cn"]
                     usersQuery:
                       baseDN: "cn=users,cn=accounts,dc=fedoracapital,dc=io"
                       scope: sub
                       derefAliases: never
-                      filter: "(objectclass=person)"
                     userUIDAttribute: dn
                     userNameAttributes: ["uid"]
                     groupMembershipAttributes: ["member"]
