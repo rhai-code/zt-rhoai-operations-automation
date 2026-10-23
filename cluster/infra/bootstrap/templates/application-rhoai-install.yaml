@@ -18,11 +18,16 @@ spec:
       enabled: true
       selfHeal: true
     syncOptions:
-      # ServerSideApply keeps Git the source of truth for the Subscription and
-      # the platform CRs (DSCI/DSC). SSA only owns what Git declares — the
-      # operator-managed DSC extras and the maasPlatform hook-Job patches
-      # (modelsAsAService, mlflowoperator) are never reverted.
-      - ServerSideApply=true
+      # CLIENT-SIDE apply (no ServerSideApply): a stale argocd-controller SSA
+      # field-manager entry on the live DataScienceCluster (left over from an
+      # earlier iteration of this repo) owns spec.components fields the v2
+      # schema has since DROPPED (codeflare, datasciencepipelines). Every SSA
+      # apply prunes those ghosts and trips the one-directional CEL rule on
+      # kserve.modelsAsService ("cannot re-enable once Removed"). Client-side
+      # three-way merge doesn't consult managedFields, and it PRESERVES every
+      # live-changed field not in Git (modelsAsAService, llamastackoperator,
+      # nim.airGapped, wva, kueue defaults, ...) — last-applied != live means
+      # "someone else changed it", so nothing is reverted.
       # The rhods CRDs are installed by the operator in response to the
       # Subscription (~2-3 min). SkipDryRunOnMissingResource + retry bridge the
       # gap; the DSCI/DSC apply once the CRDs exist.
