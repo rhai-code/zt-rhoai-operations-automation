@@ -1,7 +1,10 @@
 ---
 # Per-subscription MaaS telemetry — powers the RHOAI dashboard's token-usage
-# views. Both CRs target the MaaS gateway; Git-managed at wave 2, after the
-# operator-crs-wait Job confirms the Kuadrant + Istio telemetry CRDs exist.
+# views. Both CRs target the MaaS gateway; Git-managed directly — the Kuadrant
+# TelemetryPolicy CRD is registered by the RHCL CSV and the Istio Telemetry CRD
+# by RHOAI serving, so on a fresh cluster the first sync attempts fail with
+# "no matches for kind" until those exist — SkipDryRunOnMissingResource + the
+# app's retry bridge the gap (the same pattern as the kueue app).
 ---
 # Istio Telemetry: adds a `subscription` tag (from the x-maas-subscription
 # request header) to the gateway's REQUEST_DURATION metric, so latency can be
@@ -12,8 +15,6 @@ kind: Telemetry
 metadata:
   name: latency-per-subscription
   namespace: openshift-ingress
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
 spec:
   selector:
     matchLabels:
@@ -43,8 +44,6 @@ metadata:
   namespace: openshift-ingress
   labels:
     app.kubernetes.io/part-of: maas-observability
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
 spec:
   metrics:
     default:
