@@ -1,6 +1,4 @@
 ---
-# OpenTelemetry + Cluster Observability operator subscriptions — prerequisites
----
 apiVersion: v1
 kind: Namespace
 metadata:
