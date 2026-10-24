@@ -3,42 +3,76 @@
 # for the RHOAI data-science monitoring stack (redhat-ods-monitoring: Prometheus,
 # Alertmanager, collector, Perses) and the MaaS observability dashboards. The
 # RHOAI operator refuses to provision monitoring without them ("Monitoring
-# preconditions failed: OpenTelemetryCollector operator must be installed /
-# ClusterObservability operator must be installed" — hit on m6lx9, where these
-# were missing from the cluster layer; fde2 had them from its original setup).
+# preconditions failed" — hit on m6lx9, where these were missing from the
+# cluster layer; fde2 had them from its original setup).
 #
-# They land in openshift-operators (the shared global OperatorGroup, like
-# kueue/authorino/rhcl) because their CSVs only support the AllNamespaces
-# install mode — installing them in a dedicated namespace with an OwnNamespace
-# OperatorGroup fails with "OwnNamespace InstallModeType not supported, cannot
-# configure to watch own namespace" (hit on m6lx9; fde2's dedicated-namespace
-# CSVs sit Failed for the same reason, with pods surviving from an earlier
-# install). Wave 0, same wave as the other OLM subscriptions.
+# Pattern mirrors the rhoai-cluster-pool observability operators (values-v0.yaml
+# `global: true` + the olm-v0-chart operator-group template): each operator gets
+# a dedicated namespace and a GLOBAL OperatorGroup — NO targetNamespaces, which
+# selects the AllNamespaces install mode. These CSVs reject the OwnNamespace
+# mode ("OwnNamespace InstallModeType not supported, cannot configure to watch
+# own namespace" — hit on m6lx9 with a scoped OG; fde2's dedicated-namespace
+# CSVs sit Failed for the same reason). Wave 0, same wave as the other OLM
+# subscriptions.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-cluster-observability-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: cluster-observability-operator-og
+  namespace: openshift-cluster-observability-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  upgradeStrategy: Default
 ---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: opentelemetry-product
-  namespace: openshift-operators
+  name: cluster-observability-operator
+  namespace: openshift-cluster-observability-operator
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   channel: stable
   installPlanApproval: Automatic
-  name: opentelemetry-product
+  name: cluster-observability-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 ---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-opentelemetry-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: opentelemetry-product-og
+  namespace: openshift-opentelemetry-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  upgradeStrategy: Default
+---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: cluster-observability-operator
-  namespace: openshift-operators
+  name: opentelemetry-product
+  namespace: openshift-opentelemetry-operator
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   channel: stable
   installPlanApproval: Automatic
-  name: cluster-observability-operator
+  name: opentelemetry-product
   source: redhat-operators
   sourceNamespace: openshift-marketplace
