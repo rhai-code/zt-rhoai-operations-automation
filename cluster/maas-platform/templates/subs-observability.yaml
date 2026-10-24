@@ -1,19 +1,5 @@
 ---
 # OpenTelemetry + Cluster Observability operator subscriptions — prerequisites
-# for the RHOAI data-science monitoring stack (redhat-ods-monitoring: Prometheus,
-# Alertmanager, collector, Perses) and the MaaS observability dashboards. The
-# RHOAI operator refuses to provision monitoring without them ("Monitoring
-# preconditions failed" — hit on m6lx9, where these were missing from the
-# cluster layer; fde2 had them from its original setup).
-#
-# Pattern mirrors the rhoai-cluster-pool observability operators (values-v0.yaml
-# `global: true` + the olm-v0-chart operator-group template): each operator gets
-# a dedicated namespace and a GLOBAL OperatorGroup — NO targetNamespaces, which
-# selects the AllNamespaces install mode. These CSVs reject the OwnNamespace
-# mode ("OwnNamespace InstallModeType not supported, cannot configure to watch
-# own namespace" — hit on m6lx9 with a scoped OG; fde2's dedicated-namespace
-# CSVs sit Failed for the same reason). Wave 0, same wave as the other OLM
-# subscriptions.
 ---
 apiVersion: v1
 kind: Namespace
