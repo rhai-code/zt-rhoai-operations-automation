@@ -55,7 +55,6 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
     opendatahub.io/managed: "false"
-    security.opendatahub.io/authorino-tls-bootstrap: "true"
   labels:
     app.kubernetes.io/name: maas
     app.kubernetes.io/instance: maas-default-gateway
@@ -110,8 +109,6 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
     opendatahub.io/managed: "false"
-    # Lets the ODH/Authorino stack bootstrap gateway TLS wiring automatically.
-    security.opendatahub.io/authorino-tls-bootstrap: "true"
   labels:
     app.kubernetes.io/name: maas
     app.kubernetes.io/instance: maas-default-gateway
