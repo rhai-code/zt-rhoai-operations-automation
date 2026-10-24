@@ -1,0 +1,75 @@
+{{ if eq .Values.gatewayMode "clusterip" -}}
+---
+# Authorino TLS bootstrap ordering kick — wave 3, AFTER dsc-maas-enable (wave 2).
+#
+# WHY THIS EXISTS (the phoenix-pattern ordering bug on a fresh cluster):
+#   The Gateway's security.opendatahub.io/authorino-tls-bootstrap annotation opts the
+#   odh-model-controller's gateway-auth-bootstrap controller into wiring the gateway's
+#   auth chain. But the controller decides TLS-vs-plaintext by listing the Authorino CR
+#   in kuadrant-system, and when the list is EMPTY (or fails) it ASSUMES TLS is enabled:
+#
+#     func IsAuthorinoTLSEnabled(...) bool {
+#         if err := c.List(...); err != nil { return true }   // fail-open
+#         if len(authorinoList.Items) == 0 { return true }    // no CR yet
+#         return ptr.Deref(...Spec.Listener.Tls.Enabled, false)
+#     }
+#
+#   On a fresh cluster the Gateway and the Kuadrant CR land together in wave 0, so the
+#   controller's first reconciliation runs BEFORE the Kuadrant operator has deployed the
+#   Authorino CR — it assumes TLS, and creates a client-TLS EnvoyFilter
+#   (UpstreamTlsContext, trusted_ca: service-ca.crt) on the kuadrant-auth-service cluster.
+#   The Kuadrant operator then creates the Authorino CR with listener.tls DISABLED (the
+#   by-design plaintext path: kuadrant-system has no Istio sidecars), so the gateway's
+#   shim then speaks TLS to a plaintext gRPC server. The TLS handshake hangs, every
+#   auth eval fails (gRPC non-OK), the identity headers (X-MaaS-Username) never get
+#   injected, and the maas-api 500s on "Missing or empty username header" for every
+#   request.
+#
+#   Nothing self-heals: the gateway-auth-bootstrap controller watches Gateway,
+#   EnvoyFilter, AuthPolicy, PodMonitor, LLMInferenceService, Namespace and ConfigMap —
+#   but NOT the Authorino CR — so the Authorino arriving never re-triggers it.
+#
+# THE KICK:
+#   Wait for the Authorino CR to exist (created by the Kuadrant operator from the
+#   Kuadrant CR), then touch a timestamp annotation on the Gateway. With the bootstrap
+#   annotation enabled, ANY Gateway update re-triggers the controller, which now reads
+#   the REAL Authorino CR (listener.tls disabled -> false), skips/deletes the
+#   client-TLS EnvoyFilter, and leaves the Kuadrant ext_authz filter talking PLAINTEXT
+#   gRPC to Authorino — exactly as the ph-deploy-configure-rhoai design requires
+#   (authorino-service-ca-trust.yaml: "kuadrant-system has no Istio sidecars, so the
+#   Kuadrant ext_authz EnvoyFilter talks to Authorino over PLAINTEXT gRPC (:50051)").
+#
+# Idempotent (same value); BeforeHookCreation re-runs on every sync. Runs as the
+# maas-setup SA (needs authorino list + gateway patch — see rbac.yaml).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: maas-tls-bootstrap-kick
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  template:
+    spec:
+      serviceAccountName: maas-setup
+      restartPolicy: Never
+      containers:
+        - name: kick
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              echo "Waiting for the Authorino CR in kuadrant-system (created by the Kuadrant operator)..."
+              until oc get authorino -n kuadrant-system 2>/dev/null | grep -q .; do
+                sleep 5
+              done
+              echo "Authorino CR exists: $(oc get authorino -n kuadrant-system -o name | head -1)"
+              echo "Forcing the odh-model-controller to re-reconcile the Gateway now that the real Authorino CR exists..."
+              oc annotate gateway maas-default-gateway -n openshift-ingress \
+                opendatahub.io/tls-bootstrap-kick="$(date +%s)" --overwrite
+              echo "Kicked. The controller re-reads IsAuthorinoTLSEnabled (listener.tls disabled) and deletes the stale client-TLS EnvoyFilter."
+{{- end }}

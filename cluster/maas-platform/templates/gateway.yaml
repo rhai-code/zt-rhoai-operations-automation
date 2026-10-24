@@ -55,6 +55,15 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
     opendatahub.io/managed: "false"
+    # ODH authorino TLS bootstrap — the odh-model-controller's gateway-auth-bootstrap
+    # wires the gateway's auth chain. Ordering matters on a fresh cluster: at wave 0 the
+    # Kuadrant operator has not yet created the Authorino CR, so the controller assumes
+    # TLS is enabled and creates a client-TLS EnvoyFilter; the Authorino then arrives
+    # with listener.tls disabled (plaintext by design) and nothing re-triggers the
+    # controller (it does not watch the Authorino CR) — every request then 500s. The
+    # job-tls-bootstrap-kick template (wave 3) forces a re-reconcile once the real
+    # Authorino CR exists, which deletes the stale filter and leaves plaintext ext_authz.
+    security.opendatahub.io/authorino-tls-bootstrap: "true"
   labels:
     app.kubernetes.io/name: maas
     app.kubernetes.io/instance: maas-default-gateway
@@ -109,6 +118,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
     opendatahub.io/managed: "false"
+    # ODH authorino TLS bootstrap — see the clusterip mode's annotation for the
+    # ordering note (job-tls-bootstrap-kick re-reconciles the Gateway once the
+    # Authorino CR exists).
+    security.opendatahub.io/authorino-tls-bootstrap: "true"
   labels:
     app.kubernetes.io/name: maas
     app.kubernetes.io/instance: maas-default-gateway
