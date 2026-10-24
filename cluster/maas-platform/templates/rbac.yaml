@@ -60,6 +60,7 @@ rules:
 # gateway-auth-bootstrap controller reads) — the kick Job waits for it to
 # exist before touching the Gateway. The authorinos list verb is separate
 # from the authorino-trust patch above (which is name-scoped).
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: maas-setup-authorino-list
